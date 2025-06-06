@@ -1,6 +1,7 @@
 (function() {
-  // 1. Inject CSS
-  const css = `
+  // CSS inject
+  const style = document.createElement('style');
+  style.textContent = `
     #fb-claimer-root * { box-sizing:border-box; }
     #fb-claimer-root { all:unset; position:fixed; top:0; left:0; width:100vw; min-height:100vh; z-index:99999; background:#151c23; color:#fff; font-family: 'Fira Mono', monospace; }
     #fb-claimer-modal { background:#223447e9; position:fixed; left:0;top:0;width:100vw;height:100vh; display:flex; align-items:center;justify-content:center; z-index:1000;}
@@ -28,16 +29,15 @@
     .status { margin: 15px 0 0 0; font-size:1em; color:#fcf259; min-height:22px;}
     .error { color:#ff6767;}
     .success { color:#baff84;}
+    .fb-viphost, .fb-faucet { font-size:.97em; color:#ffecb1; margin-top:9px;}
     @media (max-width:700px){
       #fb-claimer-main {max-width:99vw;}
       .fb-claimer-panel {padding-left:0;padding-right:0;}
     }
   `;
-  const style = document.createElement('style');
-  style.textContent = css;
   document.head.appendChild(style);
 
-  // 2. Root Element
+  // Root & HTML
   const root = document.createElement('div');
   root.id = "fb-claimer-root";
   root.innerHTML = `
@@ -50,15 +50,17 @@
       </div>
     </div>
     <div id="fb-claimer-header">
-      <span id="fb-claimer-title">Sabot Claimer</span>
+      <span id="fb-claimer-title">SaBot Claimer</span>
       <span id="fb-claimer-site">Site: stake.bet</span>
     </div>
     <div id="fb-claimer-main" style="display:none;">
       <div class="fb-claimer-panel">
         <div class="panel-title">TELEGRAM BOT INFO</div>
         <div class="panel-content user-info">
-          <div>User Id: <span id="fb-userId">DEMO USER</span></div>
-          <div>Credits: <span id="fb-userCredits">500</span></div>
+          <div>User Id: <span id="fb-userId">-</span></div>
+          <div>Credits (USDT): <span id="fb-userCredits">-</span></div>
+          <div class="fb-viphost" id="fb-viphost"></div>
+          <div class="fb-faucet" id="fb-faucet"></div>
         </div>
       </div>
       <div class="fb-claimer-panel">
@@ -89,16 +91,13 @@
   `;
   document.body.appendChild(root);
 
-  // 3. Data & Logic
+  // Akun list dummy & state
   let accountList = [
+    { name: "Test" },
     { name: "Sabot" }
   ];
   let apiKey = null;
-  let userSession = {
-    id: "DEMO USER",
-    username: "DEMO USER",
-    credits: 500
-  };
+  let userSession = { id: "-", username: "-", credits: "-" };
 
   function renderAccounts(){
     const wrap = document.getElementById('fb-accounts');
@@ -115,14 +114,12 @@
       `;
       wrap.appendChild(div);
     });
-    // Bind Delete
     wrap.querySelectorAll('.fb-del').forEach(btn=>{
       btn.onclick = function(){
         accountList.splice(Number(btn.dataset.idx),1);
         renderAccounts();
       };
     });
-    // Bind Settings (example)
     wrap.querySelectorAll('.fb-set').forEach(btn=>{
       btn.onclick = function(){
         alert('Setting for '+accountList[Number(btn.dataset.idx)].name);
@@ -135,7 +132,7 @@
     s.className = "status" + (type ? (" "+type) : "");
   }
 
-  // 4. Login Logic
+  // LOGIN
   document.getElementById('fb-loginBtn').onclick = function(){
     const val = document.getElementById('fb-loginPassword').value.trim();
     if(!val){
@@ -146,7 +143,6 @@
       document.getElementById('fb-loginErr').textContent = "Wrong password!";
       return;
     }
-    // Success!
     document.getElementById('fb-claimer-modal').style.display = "none";
     document.getElementById('fb-claimer-main').style.display = "";
     renderAccounts();
@@ -157,47 +153,114 @@
     if(e.key==="Enter") document.getElementById('fb-loginBtn').click();
   });
 
-  // 5. API Connect
+  // --- MULTI QUERY on Connect API ---
   document.getElementById('fb-connectAPI').onclick = async function(){
     const input = document.getElementById('fb-apiKeyInput').value.trim();
     if(!input) return showStatus('API Key required', "error");
     if(input.length !== 96) return showStatus('API Key must be 96 chars', "error");
     apiKey = input;
     showStatus('Connecting to API...');
-    try{
-      const query = `
-        query UserMeta {
-          user { id name credits }
+
+    // --- Multi query: UserBalances & VipMeta ---
+    const userBalancesQ = `
+      query UserBalances {
+        user {
+          id
+          balances {
+            available { amount currency }
+            vault { amount currency }
+          }
         }
-      `;
+      }
+    `;
+    const vipMetaQ = `
+      query VipMeta($dailyBonusEnabled: Boolean!, $topUpEnabled: Boolean!) {
+        user {
+          vipInfo {
+            host {
+              name
+              contactHandle
+              contactLink
+              email
+              availableDays
+            }
+          }
+          reload: faucet {
+            id value active claimInterval lastClaim expireAt createdAt updatedAt expireCount
+          }
+        }
+      }
+    `;
+    // 1. Ambil Balances
+    let userId = "-", usdt = "-";
+    try {
       const res = await fetch("https://stake.com/_api/graphql", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-access-token": apiKey
         },
-        body: JSON.stringify({ query })
+        body: JSON.stringify({ query: userBalancesQ })
       });
       const json = await res.json();
       if(!json.data || !json.data.user) {
         showStatus('Invalid API Key', "error");
         return;
       }
-      userSession = {
-        id: json.data.user.id || 'UNKNOWN',
-        username: json.data.user.name || '-',
-        credits: json.data.user.credits || 0
-      };
-      document.getElementById('fb-userId').textContent = userSession.id;
-      document.getElementById('fb-userCredits').textContent = userSession.credits;
-      accountList.push({ name: userSession.username });
-      renderAccounts();
-      showStatus('API Connected!', "success");
-      document.getElementById('fb-apiKeyInput').value = '';
-    }catch(e){
-      showStatus('Error connecting API', "error");
+      userId = json.data.user.id || "-";
+      if(json.data.user.balances && Array.isArray(json.data.user.balances)) {
+        for(const bal of json.data.user.balances) {
+          if(bal.available && bal.available.currency === "usdt") {
+            usdt = bal.available.amount;
+            break;
+          }
+        }
+      }
+    } catch(e) {
+      showStatus('Error connecting API (balances)', "error");
+      return;
     }
+    // 2. Ambil VIP/Host/Reload
+    let viphost = "-", faucet = "-";
+    try {
+      const res2 = await fetch("https://stake.com/_api/graphql", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-access-token": apiKey
+        },
+        body: JSON.stringify({
+          query: vipMetaQ,
+          variables: { dailyBonusEnabled:false, topUpEnabled:false }
+        })
+      });
+      const json2 = await res2.json();
+      if(json2.data && json2.data.user) {
+        if(json2.data.user.vipInfo && json2.data.user.vipInfo.host) {
+          const h = json2.data.user.vipInfo.host;
+          viphost = (h.name ? h.name : "-") +
+            (h.contactHandle ? " ("+h.contactHandle+")" : "") +
+            (h.contactLink ? " ["+h.contactLink+"]" : "");
+        }
+        if(json2.data.user.reload) {
+          const f = json2.data.user.reload;
+          faucet = (f.active ? "Active" : "Inactive") + ", Value: " + f.value;
+        }
+      }
+    } catch(e) {
+      // skip
+    }
+    // Update UI
+    document.getElementById('fb-userId').textContent = userId;
+    document.getElementById('fb-userCredits').textContent = usdt;
+    document.getElementById('fb-viphost').textContent = "VIP Host: " + viphost;
+    document.getElementById('fb-faucet').textContent = "Faucet: " + faucet;
+
+    showStatus('API Connected!', "success");
+    document.getElementById('fb-apiKeyInput').value = '';
   };
+
+  // Paste from clipboard
   document.getElementById('fb-pasteClipboard').onclick = async function(){
     try{
       const text = await navigator.clipboard.readText();
@@ -207,22 +270,30 @@
     }
   };
 
-  // 6. Claim Bonus
+  // CLAIM BONUS (update USDT credits after claim)
   document.getElementById('fb-claimBonus').onclick = async function(){
     const code = document.getElementById('fb-bonusCodeInput').value.trim();
     if(!code) return showStatus('Code required', "error");
     if(!apiKey) return showStatus('No API Key connected', "error");
     const mutation = `
-      mutation ClaimBonusCode($code: String!, $currency: String!, $turnstileToken: String!) {
+      mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
         claimBonusCode(
-          code: $code,
-          currency: $currency,
+          code: $code
+          currency: $currency
           turnstileToken: $turnstileToken
         ) {
           bonusCode { id code }
           amount
           currency
-          user { id balances { available { amount currency } } }
+          user {
+            id
+            balances {
+              available {
+                amount
+                currency
+              }
+            }
+          }
           redeemed
         }
       }
@@ -242,11 +313,22 @@
         body: JSON.stringify({ query: mutation, variables })
       });
       const json = await res.json();
-      if(json.data && json.data.claimBonusCode && json.data.claimBonusCode.amount){
-        showStatus(`Bonus Claimed: ${json.data.claimBonusCode.amount} ${json.data.claimBonusCode.currency}`, "success");
-        // Update credits jika dapat
-        if(json.data.claimBonusCode.user && json.data.claimBonusCode.user.id === userSession.id){
-          document.getElementById('fb-userCredits').textContent = json.data.claimBonusCode.user.balances.available[0].amount;
+      if(json.data && json.data.claimBonusCode){
+        showStatus(
+          `Bonus Claimed: ${json.data.claimBonusCode.amount} ${json.data.claimBonusCode.currency}`,
+          "success"
+        );
+        // Update USDT balance
+        const user = json.data.claimBonusCode.user;
+        if(user && user.balances) {
+          let usdt = "-";
+          for(const b of user.balances) {
+            if(b.available && b.available.currency === "usdt") {
+              usdt = b.available.amount;
+              break;
+            }
+          }
+          document.getElementById('fb-userCredits').textContent = usdt;
         }
       }else if(json.errors && json.errors.length){
         showStatus(json.errors[0].message, "error");
@@ -260,5 +342,4 @@
   document.getElementById('fb-bonusCodeInput').addEventListener('keydown',function(e){
     if(e.key==="Enter") document.getElementById('fb-claimBonus').click();
   });
-
 })();
