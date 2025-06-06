@@ -52,7 +52,7 @@
       </div>
     </div>
     <div id="fb-claimer-header">
-      <span id="fb-claimer-title">FvckinBot Claimer</span>
+      <span id="fb-claimer-title">saBot Claimer</span>
       <span id="fb-claimer-site">Site: stake.bet</span>
     </div>
     <div id="fb-claimer-main" style="display:none;">
@@ -114,7 +114,7 @@
   document.body.appendChild(root);
 
   // --- STATE
-  let accountList = [{ name: "Budakcina" }, { name: "FvckinGambler" }];
+  let accountList = [{ name: "Budakcina" }, { name: "sabot" }];
   let apiKey = null;
 
   // --- RENDER ACCOUNTS
