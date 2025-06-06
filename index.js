@@ -230,7 +230,7 @@
 
    // --- STATE
 
-   let accountList = [{ name: "Budakcina" }, { name: "sabot" }];
+   let accountList = [{ name: "Demo akun" }, { name: "sabot" }];
 
    let apiKey = null;
 
