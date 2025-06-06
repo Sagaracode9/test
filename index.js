@@ -57,7 +57,6 @@
   <div id="fb-claimer-main" class="container-fluid" style="display:none;max-width:700px;margin:60px auto 50px auto;">
     <nav class="navbar navbar-expand navbar-dark bg-primary rounded-bottom mb-4 px-4 py-2 shadow">
       <span class="navbar-brand fw-bold">saBot Claimer</span>
-      <span class="ms-auto text-light small">Site: stake.bet</span>
     </nav>
     <div class="card shadow mb-4">
       <div class="card-header fw-semibold bg-gradient text-primary">User & Balance Info</div>
