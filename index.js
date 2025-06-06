@@ -1,15 +1,16 @@
-// == sagara Claimer UI - FULL JS==
-(function(){
-  // --- Tambah CSS ---
-  const style = document.createElement('style');
-  style.textContent = `
-    body { background: #151c23; color: #fff; font-family: 'Fira Mono', monospace; margin:0; padding:0;}
-    .header { background: #212f3d; padding: 18px 32px; font-size: 1.7em; border-radius: 0 0 14px 14px; display:flex; justify-content:space-between; align-items:center; }
-    .title { font-weight: bold; }
-    .site { font-size: 0.85em; color: #fff9; }
-    .main { max-width: 600px; margin: 36px auto 60px auto; }
-    .panel.blue { background: #223447; margin-top: 28px; border-radius: 12px; padding: 0 0 24px 0; box-shadow: 0 2px 16px #0009; }
-    .panel .panel-title { background: #2488ff; color: #fff; font-weight: bold; border-radius: 12px 12px 0 0; padding: 11px 24px; font-size: 1.09em; letter-spacing:1px;}
+(function() {
+  // 1. Inject CSS
+  const css = `
+    #fb-claimer-root * { box-sizing:border-box; }
+    #fb-claimer-root { all:unset; position:fixed; top:0; left:0; width:100vw; min-height:100vh; z-index:99999; background:#151c23; color:#fff; font-family: 'Fira Mono', monospace; }
+    #fb-claimer-modal { background:#223447e9; position:fixed; left:0;top:0;width:100vw;height:100vh; display:flex; align-items:center;justify-content:center; z-index:1000;}
+    #fb-claimer-modal .popup-inner { background:#253a50; padding:36px 28px; border-radius:13px; min-width:260px; max-width:95vw; box-shadow:0 6px 36px #000b;}
+    #fb-claimer-header { background: #212f3d; padding: 18px 32px; font-size: 1.7em; border-radius: 0 0 14px 14px; display:flex; justify-content:space-between; align-items:center; }
+    #fb-claimer-title { font-weight: bold; }
+    #fb-claimer-site { font-size: 0.85em; color: #fff9; }
+    #fb-claimer-main { max-width: 600px; margin: 36px auto 60px auto; }
+    .fb-claimer-panel { background: #223447; margin-top: 28px; border-radius: 12px; padding: 0 0 24px 0; box-shadow: 0 2px 16px #0009; }
+    .fb-claimer-panel .panel-title { background: #2488ff; color: #fff; font-weight: bold; border-radius: 12px 12px 0 0; padding: 11px 24px; font-size: 1.09em; letter-spacing:1px;}
     .panel-content { padding: 20px 24px 0 24px; }
     .user-info { margin-bottom:10px; font-size:1.15em;}
     .user-info div { margin-bottom:6px; }
@@ -27,70 +28,68 @@
     .status { margin: 15px 0 0 0; font-size:1em; color:#fcf259; min-height:22px;}
     .error { color:#ff6767;}
     .success { color:#baff84;}
-    /* Modal */
-    .popup { background:#223447e9; position:fixed; left:0;top:0;width:100vw;height:100vh; display:flex; align-items:center;justify-content:center; z-index:100;}
-    .popup-inner { background:#253a50; padding:36px 28px; border-radius:13px; min-width:260px; max-width:95vw; box-shadow:0 6px 36px #000b;}
-    /* Responsive */
     @media (max-width:700px){
-      .main {max-width:99vw;}
-      .panel.blue {padding-left:0;padding-right:0;}
+      #fb-claimer-main {max-width:99vw;}
+      .fb-claimer-panel {padding-left:0;padding-right:0;}
     }
   `;
+  const style = document.createElement('style');
+  style.textContent = css;
   document.head.appendChild(style);
 
-  // --- Tambah HTML via JS ---
-  const appHTML = `
-    <div id="loginModal" class="popup">
+  // 2. Root Element
+  const root = document.createElement('div');
+  root.id = "fb-claimer-root";
+  root.innerHTML = `
+    <div id="fb-claimer-modal">
       <div class="popup-inner">
         <h3 style="margin:0 0 14px 0; color:#FCF259;">Enter Password</h3>
-        <input type="password" id="loginPassword" maxlength="100" style="width:100%; margin-bottom:15px;" placeholder="Enter Password">
-        <button id="loginBtn" style="width:100%;margin-bottom:10px;">Login</button>
-        <div id="loginErr" style="color:#ff6767; min-height:20px;"></div>
+        <input type="password" id="fb-loginPassword" maxlength="100" style="width:100%; margin-bottom:15px;" placeholder="Enter Password">
+        <button id="fb-loginBtn" style="width:100%;margin-bottom:10px;">Login</button>
+        <div id="fb-loginErr" style="color:#ff6767; min-height:20px;"></div>
       </div>
     </div>
-    <div class="header">
-      <span class="title">FvckinBot Claimer</span>
-      <span class="site">Site: stake.bet</span>
+    <div id="fb-claimer-header">
+      <span id="fb-claimer-title">FvckinBot Claimer</span>
+      <span id="fb-claimer-site">Site: stake.bet</span>
     </div>
-    <div class="main" id="mainContent" style="display:none;">
-      <div class="panel blue">
+    <div id="fb-claimer-main" style="display:none;">
+      <div class="fb-claimer-panel">
         <div class="panel-title">TELEGRAM BOT INFO</div>
         <div class="panel-content user-info">
-          <div>User Id: <span id="userId">DEMO USER</span></div>
-          <div>Credits: <span id="userCredits">500</span></div>
+          <div>User Id: <span id="fb-userId">DEMO USER</span></div>
+          <div>Credits: <span id="fb-userCredits">500</span></div>
         </div>
       </div>
-      <div class="panel blue">
+      <div class="fb-claimer-panel">
         <div class="panel-title">CONNECTS ACCOUNTS</div>
         <div class="panel-content">
-          <div id="accounts" class="account-list"></div>
+          <div id="fb-accounts" class="account-list"></div>
           <div class="api-form">
-            <input type="password" id="apiKeyInput" maxlength="100" placeholder="Enter API Key (96 characters)">
-            <button id="pasteClipboard" title="Paste from clipboard">📋</button>
-            <button id="connectAPI">Connect</button>
+            <input type="password" id="fb-apiKeyInput" maxlength="100" placeholder="Enter API Key (96 characters)">
+            <button id="fb-pasteClipboard" title="Paste from clipboard">📋</button>
+            <button id="fb-connectAPI">Connect</button>
           </div>
           <div class="api-warning">
             Please be aware that maintaining multiple accounts may pose risks.
           </div>
         </div>
       </div>
-      <div class="panel blue">
+      <div class="fb-claimer-panel">
         <div class="panel-title">MANUAL CLAIM</div>
         <div class="panel-content">
           <div class="claim-form" style="margin-top:8px;">
-            <input type="text" id="bonusCodeInput" maxlength="50" placeholder="Enter Bonus Code">
-            <button id="claimBonus">Claim Bonus</button>
+            <input type="text" id="fb-bonusCodeInput" maxlength="50" placeholder="Enter Bonus Code">
+            <button id="fb-claimBonus">Claim Bonus</button>
           </div>
-          <div class="status" id="status"></div>
+          <div class="status" id="fb-status"></div>
         </div>
       </div>
     </div>
   `;
-  // Bersihkan kalau ada versi lama
-  ['loginModal','mainContent'].forEach(id=>{ const el=document.getElementById(id); if(el)el.remove(); });
-  document.body.insertAdjacentHTML('beforeend', appHTML);
+  document.body.appendChild(root);
 
-  // ============= DATA AKUN SIMULASI ==============
+  // 3. Data & Logic
   let accountList = [
     { name: "Budakcina" },
     { name: "FvckinGambler" }
@@ -102,9 +101,8 @@
     credits: 500
   };
 
-  // ============= UI HANDLING ==============
   function renderAccounts(){
-    const wrap = document.getElementById('accounts');
+    const wrap = document.getElementById('fb-accounts');
     wrap.innerHTML = "";
     accountList.forEach((acc,idx)=>{
       const div = document.createElement('div');
@@ -112,51 +110,57 @@
       div.innerHTML = `
         <span class="label">${acc.name}</span>
         <span class="btns">
-          <button title="Settings" onclick="alert('Setting for '+accountList[${idx}].name)">⚙️</button>
-          <button title="Delete" onclick="window._removeAccount(${idx})">🗑️</button>
+          <button title="Settings" data-idx="${idx}" class="fb-set">⚙️</button>
+          <button title="Delete" data-idx="${idx}" class="fb-del">🗑️</button>
         </span>
       `;
       wrap.appendChild(div);
     });
+    // Bind Delete
+    wrap.querySelectorAll('.fb-del').forEach(btn=>{
+      btn.onclick = function(){
+        accountList.splice(Number(btn.dataset.idx),1);
+        renderAccounts();
+      };
+    });
+    // Bind Settings (example)
+    wrap.querySelectorAll('.fb-set').forEach(btn=>{
+      btn.onclick = function(){
+        alert('Setting for '+accountList[Number(btn.dataset.idx)].name);
+      };
+    });
   }
-  function removeAccount(idx){
-    accountList.splice(idx,1);
-    renderAccounts();
-  }
-  window._removeAccount = removeAccount; // supaya inline onclick jalan
-
   function showStatus(msg, type=null){
-    const s = document.getElementById('status');
+    const s = document.getElementById('fb-status');
     s.textContent = msg;
     s.className = "status" + (type ? (" "+type) : "");
   }
 
-  // ============= LOGIN HANDLING ==============
-  document.getElementById('loginBtn').onclick = function(){
-    const val = document.getElementById('loginPassword').value.trim();
+  // 4. Login Logic
+  document.getElementById('fb-loginBtn').onclick = function(){
+    const val = document.getElementById('fb-loginPassword').value.trim();
     if(!val){
-      document.getElementById('loginErr').textContent = "Password required!";
+      document.getElementById('fb-loginErr').textContent = "Password required!";
       return;
     }
     if(val !== "sagara321"){
-      document.getElementById('loginErr').textContent = "Wrong password!";
+      document.getElementById('fb-loginErr').textContent = "Wrong password!";
       return;
     }
     // Success!
-    document.getElementById('loginModal').style.display = "none";
-    document.getElementById('mainContent').style.display = "";
+    document.getElementById('fb-claimer-modal').style.display = "none";
+    document.getElementById('fb-claimer-main').style.display = "";
     renderAccounts();
-    document.getElementById('userId').textContent = userSession.id;
-    document.getElementById('userCredits').textContent = userSession.credits;
+    document.getElementById('fb-userId').textContent = userSession.id;
+    document.getElementById('fb-userCredits').textContent = userSession.credits;
   };
-
-  document.getElementById('loginPassword').addEventListener('keydown',function(e){
-    if(e.key==="Enter") document.getElementById('loginBtn').click();
+  document.getElementById('fb-loginPassword').addEventListener('keydown',function(e){
+    if(e.key==="Enter") document.getElementById('fb-loginBtn').click();
   });
 
-  // ============= API CONNECT HANDLING ==============
-  document.getElementById('connectAPI').onclick = async function(){
-    const input = document.getElementById('apiKeyInput').value.trim();
+  // 5. API Connect
+  document.getElementById('fb-connectAPI').onclick = async function(){
+    const input = document.getElementById('fb-apiKeyInput').value.trim();
     if(!input) return showStatus('API Key required', "error");
     if(input.length !== 96) return showStatus('API Key must be 96 chars', "error");
     apiKey = input;
@@ -185,30 +189,28 @@
         username: json.data.user.name || '-',
         credits: json.data.user.credits || 0
       };
-      document.getElementById('userId').textContent = userSession.id;
-      document.getElementById('userCredits').textContent = userSession.credits;
-      // Simulasi: akun bertambah
+      document.getElementById('fb-userId').textContent = userSession.id;
+      document.getElementById('fb-userCredits').textContent = userSession.credits;
       accountList.push({ name: userSession.username });
       renderAccounts();
       showStatus('API Connected!', "success");
-      document.getElementById('apiKeyInput').value = '';
+      document.getElementById('fb-apiKeyInput').value = '';
     }catch(e){
       showStatus('Error connecting API', "error");
     }
   };
-
-  document.getElementById('pasteClipboard').onclick = async function(){
+  document.getElementById('fb-pasteClipboard').onclick = async function(){
     try{
       const text = await navigator.clipboard.readText();
-      document.getElementById('apiKeyInput').value = text || '';
+      document.getElementById('fb-apiKeyInput').value = text || '';
     }catch{
       showStatus('Clipboard not accessible', "error");
     }
   };
 
-  // ============= CLAIM BONUS HANDLING ==============
-  document.getElementById('claimBonus').onclick = async function(){
-    const code = document.getElementById('bonusCodeInput').value.trim();
+  // 6. Claim Bonus
+  document.getElementById('fb-claimBonus').onclick = async function(){
+    const code = document.getElementById('fb-bonusCodeInput').value.trim();
     if(!code) return showStatus('Code required', "error");
     if(!apiKey) return showStatus('No API Key connected', "error");
     const mutation = `
@@ -245,7 +247,7 @@
         showStatus(`Bonus Claimed: ${json.data.claimBonusCode.amount} ${json.data.claimBonusCode.currency}`, "success");
         // Update credits jika dapat
         if(json.data.claimBonusCode.user && json.data.claimBonusCode.user.id === userSession.id){
-          document.getElementById('userCredits').textContent = json.data.claimBonusCode.user.balances.available[0].amount;
+          document.getElementById('fb-userCredits').textContent = json.data.claimBonusCode.user.balances.available[0].amount;
         }
       }else if(json.errors && json.errors.length){
         showStatus(json.errors[0].message, "error");
@@ -256,8 +258,8 @@
       showStatus('Error on bonus claim', "error");
     }
   };
-
-  document.getElementById('bonusCodeInput').addEventListener('keydown',function(e){
-    if(e.key==="Enter") document.getElementById('claimBonus').click();
+  document.getElementById('fb-bonusCodeInput').addEventListener('keydown',function(e){
+    if(e.key==="Enter") document.getElementById('fb-claimBonus').click();
   });
+
 })();
