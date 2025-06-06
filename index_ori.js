@@ -28,13 +28,13 @@
       <div id="userInfo" class="mb-2">
         User ID: <span id="userId">-</span> | Credits: <span id="userCredits">-</span>
       </div>
-      <div id="licensePopup" class="popup hidden">
-        <div style="font-weight:bold;">Enter License Key</div>
-        <input type="text" id="licenseInput" style="width:320px" autocomplete="off">
+      <div id="licensePopup" class="popup">
+        <div style="font-weight:bold;">Enter Password</div>
+        <input type="password" id="licenseInput" style="width:320px" autocomplete="off">
         <div id="licenseError" class="error mb-2"></div>
         <button id="licenseBtn">Login</button>
       </div>
-      <div id="mainContent" class="">
+      <div id="mainContent" class="hidden">
         <h4>Add Account (API Key)</h4>
         <input type="text" id="apiKeyInput" placeholder="Paste 96-char API Key" style="width:320px">
         <button id="connectAccBtn">Connect</button>
@@ -69,13 +69,9 @@
 
   // ====== Logic JS after UI displayed ======
   // --- State
-  let licenseKey = localStorage.getItem('licenseKey');
-  let ws = null;
-  let licenseAuthed = false;
   let userData = { id: '-', credits: 0 };
   let userAccounts = [];
 
-  const websocketEndpoint = 'wss://b113f308-530d-4b65-964f-24d57e2cbe10-00-2j0vqotdaqayc.sisko.replit.dev:3000';
   const mainApiPath = '/_api/graphql';
   const currencies = ['btc', 'eth', 'bnb', 'usdt', 'dai', 'busd', 'cro', 'ltc', 'bch', 'doge', 'uni', 'sand', 'ape', 'shib', 'usdc', 'trx', 'eos', 'xrp', 'pol', 'link'];
   const claimTypes = { drop: [200, 100], bonus: [100, 50], reload: 20 };
@@ -198,48 +194,6 @@
     }
   }
 
-  // --- WebSocket
-  function connectWebSocket(endpoint, license) {
-    ws = new WebSocket(endpoint);
-    ws.addEventListener('open', () => {
-      ws.send(JSON.stringify({ type: 'licenseAuth', license: license }));
-      setStatus('Connecting...', false);
-      addLog('INFO', 'WebSocket open, authenticating license...');
-    });
-    ws.addEventListener('message', evt => {
-      const data = JSON.parse(evt.data);
-      if (data.type === 'authenticated') {
-        licenseAuthed = true;
-        localStorage.setItem('licenseKey', license);
-        licenseKey = license;
-        userData = { id: data.id, credits: data.credits };
-        updateUserUI();
-        setStatus('Connected', true);
-        hideLicensePopup();
-        addLog('OPEN', 'License authenticated.');
-        addHistory('Login', 'License authenticated.');
-      }
-      if (data.type === 'refreshed') {
-        userData = { id: data.id, credits: data.credits };
-        updateUserUI();
-        addLog('INFO', 'User Data Refreshed.');
-      }
-      if (data.type === 'codeComing' && data.result && data.result.code) {
-        claimCodeForAllAccounts(data.result.code, data.result.type, data.result.amount);
-        addLog('INFO', `Code Coming [${data.result.code}]`);
-      }
-    });
-    ws.addEventListener('close', evt => {
-      setStatus('Disconnected', false);
-      showLicensePopup();
-      addLog('ERROR', `Connection closed (Code: ${evt.code}, Reason: ${evt.reason || 'N/A'})`);
-    });
-    ws.addEventListener('error', () => {
-      setStatus('Error', false);
-      addLog('ERROR', 'WebSocket error');
-    });
-  }
-
   // --- Account logic
   async function addAccount(apiKey) {
     if (!apiKey || apiKey.length !== 96) {
@@ -305,11 +259,16 @@
   licenseBtn.addEventListener('click', () => {
     const val = licenseInput.value.trim();
     if (!val) {
-      licenseError.textContent = 'Please enter a license key.';
+      licenseError.textContent = 'Please enter the password.';
+      return;
+    }
+    if (val !== 'Sagara321') {
+      licenseError.textContent = 'Incorrect password!';
       return;
     }
     licenseError.textContent = '';
-    connectWebSocket(websocketEndpoint, val);
+    setStatus('Connected (local password)', true);
+    hideLicensePopup();
   });
   connectAccBtn.addEventListener('click', () => {
     addAccount(apiKeyInput.value.trim());
@@ -347,26 +306,16 @@
   window.addEventListener('DOMContentLoaded', () => {
     renderAccounts();
     updateUserUI();
-    if (licenseKey) {
-      connectWebSocket(websocketEndpoint, licenseKey);
-      hideLicensePopup();
-    } else {
-      showLicensePopup();
-      setStatus('License Required', false);
-    }
+    showLicensePopup();
+    setStatus('Password Required', false);
   });
 
   // Fallback in case DOMContentLoaded already happened (paste di console)
   if(document.readyState === "complete" || document.readyState === "interactive"){
     renderAccounts();
     updateUserUI();
-    if (licenseKey) {
-      connectWebSocket(websocketEndpoint, licenseKey);
-      hideLicensePopup();
-    } else {
-      showLicensePopup();
-      setStatus('License Required', false);
-    }
+    showLicensePopup();
+    setStatus('Password Required', false);
   }
 
 })();
