@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         saBot Claimer Modern UI + Turnstile
+// @name         saBot Claimer Modern UI + Turnstile (Bypass Otomatis)
 // @namespace    http://tampermonkey.net/
-// @version      4.0
-// @description  Modern Stake Bonus Claimer dengan Captcha Turnstile (Widget Muncul!)
+// @version      4.1
+// @description  Modern Stake Bonus Claimer: jika captcha kosong auto generate random, widget selalu muncul!
 // @author       GeminiAI & OpenAI
 // @match        https://stake.com/*
 // @grant        none
@@ -131,7 +131,7 @@
           <label class="form-label">Turnstile Captcha:</label>
           <input type="text" class="form-control mb-2" id="fb-turnstileToken" placeholder="Auto terisi jika captcha berhasil, atau bisa diisi manual/random.">
           <div id="fb-turnstile-widget" class="my-2"></div>
-          <div class="form-text">Captcha harus diisi! Klik pada captcha di bawah, tunggu selesai (token otomatis masuk ke atas).</div>
+          <div class="form-text">Captcha bisa dikosongkan (otomatis generate random), atau klik widget untuk token asli.</div>
         </div>
         <div id="fb-status" class="alert py-2 px-3 mb-1 small" style="display:none;"></div>
         <div id="fb-log" class="border rounded small bg-dark-subtle p-2" style="min-height:60px;max-height:170px;overflow-y:auto;"></div>
@@ -205,7 +205,6 @@
   function renderTurnstileWidget() {
     const container = document.getElementById('fb-turnstile-widget');
     container.innerHTML = ""; // reset
-    // Window.turnstile bisa didapat jika JS sudah diload
     if (window.turnstile && container) {
       window.turnstile.render(container, {
         sitekey: T_SITEKEY,
@@ -214,7 +213,6 @@
         }
       });
     } else {
-      // jika belum, tunggu dan retry
       setTimeout(renderTurnstileWidget, 600);
     }
   }
@@ -227,7 +225,6 @@
     document.getElementById('fb-claimer-modal').style.display = "none";
     document.getElementById('fb-claimer-panel-main').style.display = "";
     loadAccounts();
-    // Render Turnstile widget setiap login berhasil!
     setTimeout(renderTurnstileWidget, 500);
   };
   document.getElementById('fb-loginPassword').addEventListener('keydown', function(e) {
@@ -341,9 +338,11 @@
     if (!code) return showStatus('Input bonus code', "error");
     const type = document.getElementById('fb-claimType').value;
     let turnstileToken = document.getElementById('fb-turnstileToken').value.trim();
+    // --- Jika captcha kosong, generate otomatis token random
     if (!turnstileToken) {
-      showStatus('Belum mengisi captcha! Wajib isi!', 'error');
-      return;
+      turnstileToken = randTurnstileToken();
+      document.getElementById('fb-turnstileToken').value = turnstileToken;
+      showStatus('Captcha token dikosongkan, memakai token random. Server bisa menolak claim!', 'info');
     }
     const mutation =
       type === "ClaimConditionBonusCode"
@@ -400,16 +399,14 @@
       }
     } catch (e) { showStatus('Error on bonus claim', "error"); }
   };
+
   document.getElementById('fb-bonusCodeInput').addEventListener('keydown', function(e) {
     if (e.key === "Enter") document.getElementById('fb-claimBonus').click();
   });
 
-  // Expose on window (untuk debugging, opsional)
+  // Expose widget render (debug/manual)
   window.fb_claim_renderTurnstileWidget = renderTurnstileWidget;
-
-  // Global callback Cloudflare turnstile (wajib agar widget bisa muncul otomatis jika JS sudah siap)
-  window.onTurnstileLoad = function() {
-    renderTurnstileWidget();
-  };
+  // Turnstile global callback
+  window.onTurnstileLoad = renderTurnstileWidget;
 
 })();
