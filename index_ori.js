@@ -1,41 +1,41 @@
+// ==UserScript==
+// @name         saBot Claimer - Turnstile Edition
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  Multi-account Stake Claimer with Cloudflare Turnstile
+// @match        https://stake.com/*
+// @grant        none
+// ==/UserScript==
+
 (function() {
-  // Konstanta
   const API_URL = "https://stake.com/_api/graphql";
   const AUTH_PASSWORD = "sagara321";
   const LS_ACCOUNTS = "sb_accs";
-  const CF_SITEKEY = "0x4AAAAAAAGD4gMGOTFnvupz";
+  const T_SITEKEY = "0x4AAAAAAAGD4gMGOTFnvupz"; // <-- Ganti dengan sitekey kamu!
 
-  // Inject Cloudflare Turnstile JS (jika belum ada)
-  function injectTurnstileScript() {
-    if (!window.turnstile) {
-      const s = document.createElement("script");
-      s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-      s.async = true;
-      document.head.appendChild(s);
-    }
+  // Inject Bootstrap (CSS only, for simple style)
+  if (!document.getElementById("bs-claimer-bootstrap")) {
+    const link = document.createElement("link");
+    link.id = "bs-claimer-bootstrap";
+    link.rel = "stylesheet";
+    link.href = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css";
+    document.head.appendChild(link);
   }
-  injectTurnstileScript();
 
-  // --- Inject Bootstrap 5.3 CDN jika belum ada
-  function injectBootstrap() {
-    if (!document.getElementById("bs-claimer-bootstrap")) {
-      const link = document.createElement("link");
-      link.id = "bs-claimer-bootstrap";
-      link.rel = "stylesheet";
-      link.href = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css";
-      document.head.appendChild(link);
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js";
-      document.body.appendChild(script);
-    }
+  // Inject Turnstile
+  if (!window.turnstile && !document.getElementById("cf-turnstile-script")) {
+    const script = document.createElement("script");
+    script.id = "cf-turnstile-script";
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    document.head.appendChild(script);
   }
-  injectBootstrap();
 
-  // --- UI Root
-  const root = document.createElement('div');
+  // --- UI
+  const root = document.createElement("div");
   root.id = "fb-claimer-root";
   root.innerHTML = `
-  <div class="modal fade show d-block" id="fb-claimer-modal" tabindex="-1" aria-modal="true" role="dialog" style="background:rgba(34,44,55,0.96);z-index:2147483647;">
+  <div class="modal fade show d-block" id="fb-claimer-modal" tabindex="-1" aria-modal="true" role="dialog"
+    style="background:rgba(34,44,55,0.96);z-index:2147483647;">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content shadow border-0">
         <div class="modal-header bg-primary text-white">
@@ -51,11 +51,12 @@
       </div>
     </div>
   </div>
-  <div id="fb-claimer-panel-main" class="container-fluid p-0" style="display:none;max-width:700px;margin:60px auto 50px auto;z-index:2147483647;position:relative;">
+  <div id="fb-claimer-panel-main" class="container-fluid p-0" style="display:none;max-width:760px;margin:60px auto 50px auto;z-index:2147483647;position:relative;height:90vh;">
     <nav class="navbar navbar-expand navbar-dark bg-primary rounded-bottom mb-4 px-4 py-2 shadow" style="z-index:999;">
       <span class="navbar-brand fw-bold">saBot Claimer</span>
       <span class="ms-auto text-light small">Site: stake.bet</span>
     </nav>
+    <div style="height:calc(90vh - 80px);overflow-y:auto;padding-right:10px;">
     <div class="card shadow mb-4">
       <div class="card-header fw-semibold bg-gradient text-primary">User & Balance Info</div>
       <div class="card-body">
@@ -80,10 +81,9 @@
           <button class="btn btn-outline-secondary" type="button" id="fb-pasteClipboard" title="Paste from clipboard">📋</button>
           <button class="btn btn-primary" type="button" id="fb-connectAPI">Connect</button>
         </div>
-        <div id="fb-turnstile-widgets" class="mt-2"></div>
         <div class="alert alert-warning py-2 px-3 mb-0 small">
           Multiple account: Use at your own risk.<br>
-          <b>Captcha wajib diisi/success per akun!</b>
+          <b>Captcha Turnstile</b> harus diisi tiap akun sebelum claim.
         </div>
       </div>
     </div>
@@ -118,27 +118,35 @@
             <button id="fb-claimBonus" class="btn btn-primary w-100">Claim</button>
           </div>
         </div>
+        <div class="mb-2" id="fb-turnstile-widgets-info">
+          <label class="form-label mb-1">Captcha Turnstile (isi satu per akun sebelum claim):</label>
+          <div id="fb-turnstile-widgets"></div>
+        </div>
         <div id="fb-status" class="alert py-2 px-3 mb-1 small" style="display:none;"></div>
         <div id="fb-log" class="border rounded small bg-dark-subtle p-2" style="min-height:60px;max-height:170px;overflow-y:auto;"></div>
       </div>
+    </div>
     </div>
   </div>
   `;
   document.body.appendChild(root);
 
-  // --- Always on top!
+  // --- Scroll style (biar full page tetap bisa scroll)
   root.style.position = "fixed";
   root.style.top = "0";
   root.style.left = "0";
   root.style.width = "100vw";
-  root.style.minHeight = "100vh";
+  root.style.height = "100vh";
+  root.style.overflow = "auto";
   root.style.zIndex = "2147483647";
   root.style.background = "rgba(28,36,46,0.97)";
   root.style.pointerEvents = "auto";
 
-  // --- STATE, LOGIC
+  // --- STATE
   let accounts = [];
   let activeApiKey = null;
+  let turnstileReady = false;
+
   function loadAccounts() {
     try { accounts = JSON.parse(localStorage.getItem(LS_ACCOUNTS) || "[]"); } catch { accounts = []; }
     renderAccounts();
@@ -164,7 +172,7 @@
     }
     accounts.forEach((acc, idx) => {
       const div = document.createElement('div');
-      div.className = "alert alert-secondary d-flex justify-content-between align-items-center py-2 mb-2" + (activeApiKey && acc.apiKey === activeApiKey ? " border-success border-2" : "");
+      div.className = "alert alert-secondary d-flex justify-content-between align-items-center py-2 mb-2";
       div.innerHTML = `<span class="fw-semibold text-info">${acc.name || "(Unnamed)"}</span>
       <button class="btn btn-sm btn-danger ms-2" data-idx="${idx}">🗑️</button>`;
       wrap.appendChild(div);
@@ -180,29 +188,32 @@
     });
   }
 
-  // --- Render Turnstile widget per akun
+  // --- Turnstile per akun
   function renderTurnstile() {
-    const container = document.getElementById('fb-turnstile-widgets');
-    if (!container) return;
-    container.innerHTML = '';
-    // hapus token lama
-    accounts.forEach(a => { a.turnstileToken = null; a.widgetId = null; });
+    const wrap = document.getElementById("fb-turnstile-widgets");
+    wrap.innerHTML = "";
+    // Tunggu window.turnstile ready
     if (!window.turnstile) {
-      setTimeout(renderTurnstile, 1000);
-      return;
+      setTimeout(renderTurnstile, 400); return;
     }
+    // Buat satu widget untuk setiap akun
     accounts.forEach((acc, idx) => {
-      const div = document.createElement('div');
-      div.className = "cf-turnstile mb-2";
-      div.id = "turnstile_widget_" + idx;
-      container.appendChild(div);
-      acc.widgetId = window.turnstile.render(div, {
-        sitekey: CF_SITEKEY,
+      const cont = document.createElement("div");
+      cont.id = "turnstile-widget-" + idx;
+      cont.style.display = "inline-block";
+      cont.style.marginRight = "18px";
+      wrap.appendChild(cont);
+
+      // Reset property
+      acc.turnstileToken = "";
+      acc.turnstileWidgetId = window.turnstile.render(cont, {
+        sitekey: T_SITEKEY,
         callback: function(token) {
           acc.turnstileToken = token;
         },
         "error-callback": function() {
-          acc.turnstileToken = false;
+          acc.turnstileToken = "";
+          showStatus("Captcha error, please solve again for account " + (acc.name || idx), "error");
         }
       });
     });
@@ -216,7 +227,6 @@
     document.getElementById('fb-claimer-modal').style.display = "none";
     document.getElementById('fb-claimer-panel-main').style.display = "";
     loadAccounts();
-    renderTurnstile();
   };
   document.getElementById('fb-loginPassword').addEventListener('keydown', function(e) {
     if (e.key === "Enter") document.getElementById('fb-loginBtn').click();
@@ -231,7 +241,6 @@
     showStatus('Connecting to API...');
     let userId = "-", userName = "-", userStatus = "";
     try {
-      // Query yang benar, semua variabel digunakan (tidak error!)
       const query = `query UserMeta($name: String) {
         user(name: $name) {
           id name isMuted isRainproof isBanned createdAt campaignSet
@@ -327,47 +336,50 @@
   };
 
   document.getElementById('fb-claimBonus').onclick = async function() {
-    if (accounts.length === 0) return showStatus('Connect API Key first', "error");
+    if (accounts.length === 0) return showStatus('No account connected', "error");
     const code = document.getElementById('fb-bonusCodeInput').value.trim();
     if (!code) return showStatus('Input bonus code', "error");
     const type = document.getElementById('fb-claimType').value;
 
-    // Loop akun, cek semua widget & token!
-    let atLeastOneSuccess = false;
-    for (const acc of accounts) {
-      // Validasi turnstile token
-      if (!acc.turnstileToken || typeof acc.turnstileToken !== "string" || acc.turnstileToken.length < 10) {
-        showStatus('Captcha (turnstile) belum diisi/expired untuk akun: ' + (acc.name || '-'), "error");
+    let errorAccounts = [];
+    let successAccounts = [];
+    let claimCount = 0;
+    // Satu per akun, pakai token turnstile-nya
+    for (let i = 0; i < accounts.length; ++i) {
+      const acc = accounts[i];
+      if (!acc.turnstileToken) {
+        errorAccounts.push(`${acc.name || '(Unnamed)'}` + " belum mengisi captcha!");
         continue;
       }
+      const variables = { code, currency: "usdt", turnstileToken: acc.turnstileToken };
       const mutation =
         type === "ClaimConditionBonusCode"
         ? `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
             claimConditionBonusCode(
-              code: $code
-              currency: $currency
-              turnstileToken: $turnstileToken
+               code: $code
+               currency: $currency
+               turnstileToken: $turnstileToken
             ) {
-              bonusCode { id code }
-              amount
-              currency
-              user { id balances { available { amount currency } vault { amount currency } } }
+               bonusCode { id code }
+               amount
+               currency
+               user { id balances { available { amount currency } vault { amount currency } } }
+               redeemed
             }
         }`
         : `mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
             claimBonusCode(
-              code: $code
-              currency: $currency
-              turnstileToken: $turnstileToken
+               code: $code
+               currency: $currency
+               turnstileToken: $turnstileToken
             ) {
-              bonusCode { id code }
-              amount
-              currency
-              user { id balances { available { amount currency } vault { amount currency } } }
-              redeemed
+               bonusCode { id code }
+               amount
+               currency
+               user { id balances { available { amount currency } vault { amount currency } } }
+               redeemed
             }
         }`;
-      const variables = { code, currency: "usdt", turnstileToken: acc.turnstileToken };
       try {
         const res = await fetch(API_URL, {
           method: "POST",
@@ -377,35 +389,27 @@
         const json = await res.json();
         const dataKey = type === "ClaimConditionBonusCode" ? "claimConditionBonusCode" : "claimBonusCode";
         if (json.data && json.data[dataKey]) {
-          showStatus(`Claimed: ${json.data[dataKey].amount} ${json.data[dataKey].currency} for ${acc.name}`, "success");
-          log("CLAIM " + code + " (" + acc.name + ") = " + JSON.stringify(json.data[dataKey]));
-          const user = json.data[dataKey].user;
-          if (user && user.balances) {
-            let usdt = "-";
-            if (user.balances.available && user.balances.available.currency?.toLowerCase() === "usdt") usdt = user.balances.available.amount;
-            if (user.balances.vault && user.balances.vault.currency?.toLowerCase() === "usdt") usdt += ` (Vault: ${user.balances.vault.amount})`;
-            document.getElementById('fb-userCredits').textContent = usdt;
-          }
-          atLeastOneSuccess = true;
-          // reset widget agar tidak reuse token lama
-          if (acc.widgetId && window.turnstile) window.turnstile.reset(acc.widgetId);
-          acc.turnstileToken = null;
+          successAccounts.push(`${acc.name || '(Unnamed)'}: Claimed ${json.data[dataKey].amount} ${json.data[dataKey].currency}`);
+          // reset token so must solve again (1x pakai)
+          acc.turnstileToken = "";
+          window.turnstile && acc.turnstileWidgetId && window.turnstile.reset(acc.turnstileWidgetId);
+          claimCount++;
         } else if (json.errors && json.errors.length) {
-          showStatus(json.errors[0].message, "error");
-          log("CLAIM ERR " + code + " (" + acc.name + "): " + json.errors[0].message);
-          // Jika error invalidTurnstile, reset widget!
-          if ((json.errors[0].message || "").toLowerCase().includes("invalidturnstile") && acc.widgetId && window.turnstile) {
-            window.turnstile.reset(acc.widgetId);
-            acc.turnstileToken = null;
-          }
+          errorAccounts.push(`${acc.name || '(Unnamed)'}: ${json.errors[0].message}`);
+          // reset juga biar solve ulang jika error
+          acc.turnstileToken = "";
+          window.turnstile && acc.turnstileWidgetId && window.turnstile.reset(acc.turnstileWidgetId);
         } else {
-          showStatus('Unknown error on bonus claim', "error");
+          errorAccounts.push(`${acc.name || '(Unnamed)'}: Unknown error`);
         }
-      } catch (e) { showStatus('Error on bonus claim', "error"); }
+      } catch (e) {
+        errorAccounts.push(`${acc.name || '(Unnamed)'}: Network error`);
+      }
     }
-    if (!atLeastOneSuccess) log("CLAIM " + code + ": gagal semua akun.");
+    if (successAccounts.length) showStatus(successAccounts.join("<br>"), "success");
+    if (errorAccounts.length) showStatus(errorAccounts.join("<br>"), "error");
+    log("CLAIM " + code + " -- Success: " + successAccounts.length + ", Failed: " + errorAccounts.length);
   };
-
   document.getElementById('fb-bonusCodeInput').addEventListener('keydown', function(e) {
     if (e.key === "Enter") document.getElementById('fb-claimBonus').click();
   });
