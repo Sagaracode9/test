@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         saBot Claimer Modern UI Bootstrap
+// @name         saBot Claimer Bootstrap Modern
 // @namespace    http://tampermonkey.net/
-// @version      3.1
-// @description  Modern multi-account Stake bonus claimer, Bootstrap 5 UI
-// @author       Gemini AI & Sagara
+// @version      4.1
+// @description  Stake multi-account bonus claimer, full Bootstrap UI, logic untouched
+// @author       Gemini AI
 // @match        https://stake.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -13,26 +13,32 @@
   const API_URL = "https://stake.com/_api/graphql";
   const AUTH_PASSWORD = "sagara321";
   const LS_ACCOUNTS = "sb_accs";
-  // --- Inject Bootstrap 5.3 CDN if not exists
-  function injectBootstrap() {
-    if (!document.getElementById("bs-claimer-bootstrap")) {
-      const link = document.createElement("link");
-      link.id = "bs-claimer-bootstrap";
-      link.rel = "stylesheet";
-      link.href = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css";
-      document.head.appendChild(link);
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js";
-      document.body.appendChild(script);
-    }
+
+  // --- Inject Bootstrap 5.3 CDN
+  if (!document.getElementById("bs-claimer-bootstrap")) {
+    const link = document.createElement("link");
+    link.id = "bs-claimer-bootstrap";
+    link.rel = "stylesheet";
+    link.href = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css";
+    document.head.appendChild(link);
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js";
+    document.body.appendChild(script);
   }
-  injectBootstrap();
 
   // --- Main UI Root
   const root = document.createElement('div');
   root.id = "fb-claimer-root";
+  root.style.position = "fixed";
+  root.style.top = "0";
+  root.style.left = "0";
+  root.style.width = "100vw";
+  root.style.zIndex = "2147483647";
+  root.style.background = "rgba(28,36,46,0.97)";
+  root.style.pointerEvents = "auto";
+  root.style.overflow = "auto";
   root.innerHTML = `
-  <div class="modal fade show d-block" id="fb-claimer-modal" tabindex="-1" aria-modal="true" role="dialog" style="background:rgba(34,44,55,0.96);z-index:2147483647;">
+  <div id="fb-claimer-modal" class="modal fade show d-block" tabindex="-1" aria-modal="true" role="dialog" style="background:rgba(34,44,55,0.93);z-index:2147483647;">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content shadow border-0">
         <div class="modal-header bg-primary text-white">
@@ -48,8 +54,8 @@
       </div>
     </div>
   </div>
-  <div id="fb-claimer-panel-main" class="container-fluid p-0" style="display:none;max-width:700px;margin:60px auto 50px auto;position:relative;pointer-events:auto;">
-    <nav class="navbar navbar-expand navbar-dark bg-primary rounded-bottom mb-4 px-4 py-2 shadow" style="z-index:999;">
+  <div id="fb-claimer-main" class="container-fluid" style="display:none;max-width:700px;margin:60px auto 50px auto;">
+    <nav class="navbar navbar-expand navbar-dark bg-primary rounded-bottom mb-4 px-4 py-2 shadow">
       <span class="navbar-brand fw-bold">saBot Claimer</span>
       <span class="ms-auto text-light small">Site: stake.bet</span>
     </nav>
@@ -125,19 +131,7 @@
   `;
   document.body.appendChild(root);
 
-  // --- Styling untuk kontainer utama ---
-  // [DIUBAH] Menambahkan overflow-y: auto agar bisa scroll jika kontennya panjang
-  root.style.position = "fixed";
-  root.style.top = "0";
-  root.style.left = "0";
-  root.style.width = "100vw";
-  root.style.height = "100vh"; // Menggunakan height, bukan min-height
-  root.style.zIndex = "2147483647";
-  root.style.background = "rgba(28,36,46,0.97)";
-  root.style.pointerEvents = "auto";
-  root.style.overflowY = "auto"; // <-- KUNCI UNTUK SCROLLING
-
-  // --- STATE, LOGIC
+  // --- STATE & LOGIC
   let accounts = [];
   let activeApiKey = null;
   function loadAccounts() {
@@ -190,21 +184,8 @@
     const val = document.getElementById('fb-loginPassword').value.trim();
     if (!val) return document.getElementById('fb-loginErr').textContent = "Password required!";
     if (val !== AUTH_PASSWORD) return document.getElementById('fb-loginErr').textContent = "Wrong password!";
-
-    // --- [DIUBAH] ---
-    // 1. Hapus modal login sepenuhnya, bukan hanya disembunyikan
-    const modal = document.getElementById('fb-claimer-modal');
-    if (modal) {
-        modal.remove();
-    }
-
-    // 2. Ubah style root agar tidak mengganggu halaman utama
-    root.style.background = "transparent"; // Jadikan background transparan
-    root.style.pointerEvents = "none";     // Izinkan klik menembus background
-
-    // 3. Tampilkan panel utama
-    document.getElementById('fb-claimer-panel-main').style.display = "";
-
+    document.getElementById('fb-claimer-modal').style.display = "none";
+    document.getElementById('fb-claimer-main').style.display = "";
     loadAccounts();
   };
   document.getElementById('fb-loginPassword').addEventListener('keydown', function(e) {
@@ -356,30 +337,30 @@
       type === "ClaimConditionBonusCode"
       ? `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
           claimConditionBonusCode(
-            code: $code
-            currency: $currency
-            turnstileToken: $turnstileToken
+             code: $code
+             currency: $currency
+             turnstileToken: $turnstileToken
           ) {
-            bonusCode { id code }
-            amount
-            currency
-            user { id balances { available { amount currency } vault { amount currency } } }
-            redeemed
+             bonusCode { id code }
+             amount
+             currency
+             user { id balances { available { amount currency } vault { amount currency } } }
+             redeemed
           }
-        }`
+      }`
       : `mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
           claimBonusCode(
-            code: $code
-            currency: $currency
-            turnstileToken: $turnstileToken
+             code: $code
+             currency: $currency
+             turnstileToken: $turnstileToken
           ) {
-            bonusCode { id code }
-            amount
-            currency
-            user { id balances { available { amount currency } vault { amount currency } } }
-            redeemed
+             bonusCode { id code }
+             amount
+             currency
+             user { id balances { available { amount currency } vault { amount currency } } }
+             redeemed
           }
-        }`;
+      }`;
     const variables = { code, currency: "usdt", turnstileToken };
     try {
       const res = await fetch(API_URL, {
