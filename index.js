@@ -25,7 +25,7 @@ style.textContent = `
 document.head.appendChild(style);
 
 // 2. Buat Struktur HTML
-document.body.innerHTML += `
+const mainHTML = `
   <div class="container">
     <h2>FvckinBot™ Claimer</h2>
     <div id="userPanel" class="section hidden">
@@ -64,6 +64,17 @@ document.body.innerHTML += `
   </div>
 `;
 
+// Hapus popup lama jika ada (biar aman untuk reload)
+const existPopup = document.getElementById('licensePopup');
+if(existPopup) existPopup.remove();
+
+const existMain = document.querySelector('.container');
+if(existMain) existMain.remove();
+
+document.body.insertAdjacentHTML('beforeend', mainHTML);
+
+// ============== Logic App ====================
+
 // Helper masking
 function mask(str, show=4) {
   if (!str || str.length <= show*2) return str.replace(/./g, '*');
@@ -84,7 +95,7 @@ function logAction(action, details) {
   t.appendChild(tr);
 }
 
-// AUTH PASSWORD SEDERHANA (GANTI WEBSOCKET)
+// AUTH PASSWORD SEDERHANA
 function loginLicense() {
   const input = document.getElementById('licenseInput').value.trim();
   if (!input) {
@@ -221,10 +232,10 @@ async function pasteClipboard() {
     showStatus('Clipboard not accessible', "error");
   }
 }
-// Event binding
+
+// ==== EVENT BINDING (setelah HTML sudah diinsert) ====
 document.getElementById('loginLicense').onclick = loginLicense;
 document.getElementById('connectAPI').onclick = connectAPI;
 document.getElementById('pasteClipboard').onclick = pasteClipboard;
 document.getElementById('claimBonus').onclick = claimBonus;
-// Tampilkan popup license saat load
 document.getElementById('licensePopup').style.display = 'flex';
