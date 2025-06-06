@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         saBot Claimer Modern UI
+// @name         saBot Claimer Modern UI Fix Always On Top
 // @namespace    http://tampermonkey.net/
-// @version      1.5
-// @description  Multi akun, turnstile random, modern UI, siap tempel. Berdasarkan script asli + request UI improvement by user
+// @version      2.0
+// @description  Modern multi-account Stake bonus claimer, CSS always override, UI full screen. Final fix!
 // @author       Gemini AI
 // @match        https://stake.com/*
 // @grant        GM_addStyle
@@ -15,36 +15,34 @@
   const AUTH_PASSWORD = "sagara321";
   const LS_ACCOUNTS = "sb_accs";
 
-  // --- MODERN CSS ---
+  // --- MODERN CSS (semua selector override root saja!)
   if (typeof GM_addStyle !== 'undefined') GM_addStyle(`
-#fb-claimer-root * {
-  box-sizing: border-box;
-  font-family: 'Fira Mono', monospace;
+#fb-claimer-root, #fb-claimer-root * {
+  box-sizing: border-box !important;
+  font-family: 'Fira Mono', monospace !important;
   letter-spacing: 0.01em;
 }
 #fb-claimer-root {
-  all: unset;
-  position: fixed;
-  top: 0; left: 0; width: 100vw; min-height: 100vh;
-  z-index: 99999;
-  background: linear-gradient(135deg, #19223c 0%, #192b35 100%);
-  color: #ececec;
+  all: initial;
+  position: fixed !important; top: 0 !important; left: 0 !important;
+  width: 100vw !important; min-height: 100vh !important;
+  z-index: 2147483647 !important;
+  background: linear-gradient(135deg, #19223c 0%, #192b35 100%) !important;
+  color: #ececec !important;
+  display: block !important;
 }
-.fb-claimer-panel {
-  background: #212f3d;
-  margin-top: 34px;
-  border-radius: 20px;
-  padding: 0 0 24px 0;
-  box-shadow: 0 6px 30px #000a, 0 0px 1px #17313b;
-  transition: box-shadow .15s;
+#fb-claimer-root input, #fb-claimer-root select, #fb-claimer-root button {
+  all: unset;
+  box-sizing: border-box !important;
+  font-family: inherit !important;
 }
 #fb-claimer-modal {
-  background:rgba(28,38,54,0.98);
-  position:fixed;left:0;top:0;width:100vw;height:100vh;
+  background:rgba(28,38,54,0.98) !important;
+  position:fixed !important;left:0;top:0;width:100vw;height:100vh;
   display:flex;align-items:center;justify-content:center;z-index:1000;
 }
 #fb-claimer-modal .popup-inner {
-  background: #273851;
+  background: #273851 !important;
   padding: 42px 30px;
   border-radius: 19px;
   min-width: 260px;max-width:94vw;
@@ -62,7 +60,8 @@
   color: #fff9;
   font-size: 1em;
   transition: border .15s;
-  outline: none;
+  outline: none !important;
+  display:block;
 }
 #fb-loginPassword:focus, #fb-apiKeyInput:focus, #fb-checkBonusCode:focus, #fb-bonusCodeInput:focus, #fb-turnstileToken:focus {
   border-color: #4cdd7f;
@@ -81,6 +80,7 @@
   margin-bottom: 7px;
   box-shadow:0 1px 7px #0003;
   transition:background .18s,box-shadow .18s,transform .12s;
+  display:inline-block;
 }
 #fb-loginBtn:hover, #fb-connectAPI:hover, #fb-btnCheckBonus:hover, #fb-claimBonus:hover, .account-item .fb-del:hover {
   background: linear-gradient(91deg,#45a6e4,#33eea2 95%);
@@ -102,6 +102,14 @@
 #fb-claimer-title { font-weight: bold; color: #8cffd1; font-size:1.1em; }
 #fb-claimer-site { font-size: 0.7em; color: #fff9; letter-spacing: 0.03em;}
 #fb-claimer-main { max-width: 740px; margin: 38px auto 68px auto; }
+.fb-claimer-panel {
+  background: #212f3d !important;
+  margin-top: 34px;
+  border-radius: 20px;
+  padding: 0 0 24px 0;
+  box-shadow: 0 6px 30px #000a, 0 0px 1px #17313b;
+  transition: box-shadow .15s;
+}
 .fb-claimer-panel .panel-title {
   background:linear-gradient(93deg,#2377e7,#7dfcbe 95%);
   color: #162130;
@@ -133,8 +141,8 @@
   transition:background .15s,border .13s;
 }
 .account-item.active, .account-item.active:hover {
-  background: #173853;
-  border-color: #43ffbe;
+  background: #173853 !important;
+  border-color: #43ffbe !important;
   color:#d6fffd;
 }
 .account-item .label { font-weight: 700; color: #84ffe5; letter-spacing:.01em; }
@@ -281,10 +289,20 @@
   `;
   document.body.appendChild(root);
 
-  // --- STATE & LOGIC (tidak diubah dari versi fix-mu, tapi dengan highlight akun terakhir)
+  // *** PASTIKAN root selalu on top! (Override programmatically) ***
+  root.style.all = "unset";
+  root.style.position = "fixed";
+  root.style.left = "0";
+  root.style.top = "0";
+  root.style.width = "100vw";
+  root.style.minHeight = "100vh";
+  root.style.zIndex = "2147483647";
+  root.style.background = "linear-gradient(135deg,#19223c 0%,#192b35 100%)";
+  root.style.display = "block";
+
+  // --- STATE & LOGIC tetap seperti sebelumnya (copy dari script yang sudah benar)
   let accounts = [];
   let activeApiKey = null;
-
   function loadAccounts() {
       try { accounts = JSON.parse(GM_getValue(LS_ACCOUNTS, "[]")); } catch { accounts = []; }
       renderAccounts();
@@ -542,5 +560,4 @@
   document.getElementById('fb-bonusCodeInput').addEventListener('keydown', function(e) {
       if (e.key === "Enter") document.getElementById('fb-claimBonus').click();
   });
-
 })();
