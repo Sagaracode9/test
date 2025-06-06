@@ -1,15 +1,16 @@
 // ==UserScript==
-// @name         saBot Claimer (HTML Rebuild)
+// @name         saBot Claimer (Multi-Account & Turnstile Placeholder)
 // @namespace    http://tampermonkey.net/
-// @version      1.1
-// @description  A user script to manage accounts, check, and claim bonuses on Stake.com via GraphQL API, with rebuilt UI.
-// @author       Gemini AI (Rebuild based on user's code)
+// @version      1.2
+// @description  Manage multiple Stake.com accounts, check, and claim bonuses with improved UI and Turnstile placeholder.
+// @author       Gemini AI
 // @match        https://stake.com/*
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
 // @grant        GM_info
+// @grant        unsafeWindow // Diperlukan untuk mengakses window.crypto untuk generate random UUID
 // ==/UserScript==
 
 (function() {
@@ -17,14 +18,616 @@
 
     // --- Configuration & Constants ---
     const API_URL = "https://stake.com/_api/graphql";
-    const AUTH_PASSWORD = "sagara321"; // WARNING: Hardcoded password is NOT secure for production apps! GANTI INI!
+    const AUTH_PASSWORD = "sagara321"; // WARNING: GANTI DENGAN PASSWORD KUAT ANDA!
     const LOCAL_STORAGE_KEY_ACCOUNTS = "fbClaimer_accounts";
-    const LOCAL_STORAGE_KEY_API_KEY = "fbClaimer_apiKey";
+    const LOCAL_STORAGE_KEY_CURRENT_API_KEY_IDX = "fbClaimer_currentApiKeyIndex"; // Index akun yang sedang aktif
 
-    // --- CSS inject (Rebuilt Styles) ---
-    // Menggunakan GM_addStyle untuk injeksi CSS yang lebih baik pada UserScript
-    // Ini memastikan gaya diterapkan secara lebih terisolasi.
-    if (typeof GM_addStyle !== 'undefined') {
+    // --- DOM Element References (Akan diisi setelah HTML di-render) ---
+    const elements = {};
+
+    // --- State Variables ---
+    // accounts: Array of { name: string, apiKey: string }
+    let accounts = [];
+    let currentAccountIndex = -1; // Index akun yang sedang aktif di `accounts` array
+
+    // --- Helper Functions ---
+    /**
+     * Menampilkan pesan status di UI.
+     * @param {string} msg - Pesan yang akan ditampilkan.
+     * @param {string} [type=null] - Tipe pesan ('success', 'error', 'info'). Akan ditambahkan sebagai class CSS.
+     */
+    function showStatus(msg, type = null) {
+        elements.statusDisplay.textContent = msg;
+        elements.statusDisplay.className = "status" + (type ? (" " + type) : "");
+    }
+
+    /**
+     * Menambahkan pesan ke kotak log.
+     * @param {string} msg - Pesan yang akan dicatat.
+     * @param {string} [type='info'] - Tipe pesan ('success', 'error', 'info'). Digunakan untuk styling.
+     */
+    function logMessage(msg, type = "info") {
+        const time = new Date().toLocaleTimeString();
+        const msgDiv = document.createElement('div');
+        msgDiv.innerHTML = `<div>${time}: <span class="${type}">${msg}</span></div>`;
+        elements.logBox.appendChild(msgDiv);
+        elements.logBox.scrollTop = elements.logBox.scrollHeight; // Auto-scroll ke bawah
+    }
+
+    /**
+     * Memuat data akun dan API Key dari penyimpanan lokal.
+     * Menggunakan GM_getValue untuk Tampermonkey/Greasemonkey.
+     */
+    function loadState() {
+        let storedAccounts = GM_getValue(LOCAL_STORAGE_KEY_ACCOUNTS, '[]');
+        try {
+            accounts = JSON.parse(storedAccounts);
+        } catch (e) {
+            logMessage("Failed to parse stored accounts. Resetting.", "error");
+            accounts = [];
+        }
+
+        currentAccountIndex = GM_getValue(LOCAL_STORAGE_KEY_CURRENT_API_KEY_IDX, -1);
+        if (currentAccountIndex >= accounts.length || currentAccountIndex < 0) {
+            currentAccountIndex = accounts.length > 0 ? 0 : -1; // Set ke akun pertama jika ada, atau -1
+        }
+        
+        renderAccountSelector(); // Render dropdown akun
+        selectAccount(currentAccountIndex); // Pilih akun yang terakhir aktif
+    }
+
+    /**
+     * Menyimpan data akun dan API Key ke penyimpanan lokal.
+     * Menggunakan GM_setValue untuk Tampermonkey/Greasemonkey.
+     */
+    function saveState() {
+        GM_setValue(LOCAL_STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
+        GM_setValue(LOCAL_STORAGE_KEY_CURRENT_API_KEY_IDX, currentAccountIndex);
+        logMessage("State saved.", "info");
+    }
+
+    /**
+     * Menghasilkan UUID random untuk placeholder Turnstile.
+     * Ini BUKAN token Turnstile yang valid.
+     */
+    function generateUUID() {
+        // Menggunakan API Web Crypto yang lebih aman dan benar-benar random
+        // Perlu @grant unsafeWindow di Tampermonkey
+        try {
+            return unsafeWindow.crypto.randomUUID();
+        } catch (e) {
+            // Fallback untuk lingkungan tanpa window.crypto atau unsafeWindow tidak granted
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+    }
+
+    /**
+     * Mengisi input Turnstile dengan nilai placeholder random.
+     */
+    function setRandomTurnstilePlaceholder() {
+        elements.turnstileTokenInput.value = `DEMO-TOKEN-${generateUUID()}`;
+    }
+
+    /**
+     * Memperbarui tampilan daftar akun di UI dan selector.
+     */
+    function renderAccountSelector() {
+        elements.accountsList.innerHTML = "";
+        elements.accountSelector.innerHTML = ""; // Clear existing options
+
+        if (accounts.length === 0) {
+            elements.accountsList.innerHTML = "<div style='color:#a0a0a0; font-size:0.9em; text-align:center; padding:10px 0;'>No accounts connected yet.</div>";
+            elements.accountSelector.innerHTML = "<option value='-1'>No accounts</option>";
+            elements.accountSelector.disabled = true;
+            elements.claimBonusBtn.disabled = true; // Disable claim if no account
+            elements.btnCheckBonus.disabled = true; // Disable check if no account
+            // Reset UI info
+            elements.userId.textContent = "-";
+            elements.userName.textContent = "-";
+            elements.userStatus.textContent = "N/A";
+            elements.userCredits.textContent = "-";
+            elements.vipHost.textContent = "VIP Host: N/A";
+            elements.faucet.textContent = "Faucet: N/A";
+            return;
+        }
+
+        elements.accountSelector.disabled = false;
+        elements.claimBonusBtn.disabled = false;
+        elements.btnCheckBonus.disabled = false;
+
+        accounts.forEach((acc, idx) => {
+            // Render di Account List
+            const div = document.createElement('div');
+            div.className = "account-item";
+            div.innerHTML = `
+                <span class="label">${acc.name}</span>
+                <span class="btns">
+                    <button title="Set Active" data-idx="${idx}" class="fb-set-active">✅</button>
+                    <button title="Delete" data-idx="${idx}" class="fb-del">🗑️</button>
+                </span>
+            `;
+            elements.accountsList.appendChild(div);
+
+            // Render di Account Selector
+            const option = document.createElement('option');
+            option.value = idx;
+            option.textContent = acc.name;
+            elements.accountSelector.appendChild(option);
+        });
+
+        // Add event listeners after rendering
+        elements.accountsList.querySelectorAll('.fb-del').forEach(btn => {
+            btn.onclick = function() {
+                const indexToDelete = Number(btn.dataset.idx);
+                if (confirm(`Are you sure you want to delete account: ${accounts[indexToDelete].name}?`)) {
+                    const deletedAccountName = accounts[indexToDelete].name;
+                    accounts.splice(indexToDelete, 1);
+                    
+                    // Adjust currentAccountIndex if deleted account was active
+                    if (currentAccountIndex === indexToDelete) {
+                        currentAccountIndex = accounts.length > 0 ? 0 : -1;
+                    } else if (currentAccountIndex > indexToDelete) {
+                        currentAccountIndex--; // Shift index if account before it was deleted
+                    }
+                    
+                    saveState();
+                    renderAccountSelector(); // Re-render both lists
+                    selectAccount(currentAccountIndex); // Re-select active account
+                    logMessage(`Account '${deletedAccountName}' deleted.`, "info");
+                }
+            };
+        });
+
+        elements.accountsList.querySelectorAll('.fb-set-active').forEach(btn => {
+            btn.onclick = function() {
+                const indexToActivate = Number(btn.dataset.idx);
+                selectAccount(indexToActivate);
+            };
+        });
+        
+        // Pastikan dropdown menampilkan akun yang aktif
+        if (currentAccountIndex !== -1) {
+             elements.accountSelector.value = currentAccountIndex;
+        }
+    }
+
+    /**
+     * Memilih akun aktif dari daftar dan memperbarui API Key.
+     * @param {number} index - Index akun di array `accounts`.
+     */
+    function selectAccount(index) {
+        if (index >= 0 && index < accounts.length) {
+            currentAccountIndex = index;
+            currentApiKey = accounts[index].apiKey;
+            saveState(); // Simpan index akun aktif
+            
+            // Perbarui UI info dengan data dari akun yang dipilih (jika tersedia)
+            elements.apiKeyInput.value = accounts[index].apiKey; // Tampilkan API key di input
+            // Refresh info pengguna dari API untuk akun yang baru dipilih
+            handleConnectAPI(false); // Panggil tanpa menyimpan API key lagi
+            logMessage(`Switched to account: ${accounts[index].name}`, "info");
+        } else {
+            currentAccountIndex = -1;
+            currentApiKey = null;
+            saveState();
+            elements.apiKeyInput.value = '';
+            logMessage("No account selected.", "info");
+             // Reset UI info
+            elements.userId.textContent = "-";
+            elements.userName.textContent = "-";
+            elements.userStatus.textContent = "N/A";
+            elements.userCredits.textContent = "-";
+            elements.vipHost.textContent = "VIP Host: N/A";
+            elements.faucet.textContent = "Faucet: N/A";
+        }
+        elements.accountSelector.value = currentAccountIndex; // Update dropdown
+    }
+
+    /**
+     * Melakukan panggilan ke API GraphQL.
+     * @param {string} query - String query/mutasi GraphQL.
+     * @param {object} [variables={}] - Variabel untuk query/mutasi.
+     * @returns {Promise<object>} Data hasil dari API.
+     * @throws {Error} Jika ada error dari API atau jaringan.
+     */
+    async function callGraphQL(query, variables = {}) {
+        const headers = {
+            "Content-Type": "application/json",
+        };
+        if (currentApiKey) {
+            headers["x-access-token"] = currentApiKey;
+        } else {
+            throw new Error("No API Key connected. Please connect an account first.");
+        }
+
+        try {
+            const res = await fetch(API_URL, {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify({ query, variables })
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`HTTP Error: ${res.status} ${res.statusText} - ${errorText}`);
+            }
+
+            const json = await res.json();
+            if (json.errors && json.errors.length > 0) {
+                throw new Error(json.errors[0].message || "GraphQL error occurred.");
+            }
+            return json.data;
+        } catch (e) {
+            throw new Error(`API Error: ${e.message}`);
+        }
+    }
+
+    // --- API Calls (Using new callGraphQL helper) ---
+    async function fetchUserMetaData() {
+        const query = `
+            query UserMeta($name: String, $signupCode: Boolean = false) {
+                user(name: $name) {
+                    id
+                    name
+                    isMuted
+                    isRainproof
+                    isBanned
+                    createdAt
+                    campaignSet
+                    selfExclude { id status active createdAt expireAt }
+                    signupCode @include(if: $signupCode) { id code { id code } }
+                }
+            }`;
+        try {
+            const data = await callGraphQL(query, { name: null, signupCode: false });
+            return data.user || null;
+        } catch (e) {
+            logMessage(`Error fetching UserMeta: ${e.message}`, "error");
+            return null;
+        }
+    }
+
+    async function fetchUserBalances() {
+        const query = `
+            query UserBalances {
+                user {
+                    id
+                    balances {
+                        available { amount currency }
+                        vault { amount currency }
+                    }
+                }
+            }`;
+        try {
+            const data = await callGraphQL(query);
+            return data.user ? data.user.balances : null;
+        } catch (e) {
+            logMessage(`Error fetching UserBalances: ${e.message}`, "error");
+            return null;
+        }
+    }
+
+    async function fetchVipFaucetData() {
+        const query = `
+            query VipMeta {
+                user {
+                    vipInfo {
+                        host { name contactHandle contactLink email availableDays }
+                    }
+                    reload: faucet { value active }
+                }
+            }`;
+        try {
+            const data = await callGraphQL(query); // No variables in this query
+            return data.user || null;
+        } catch (e) {
+            logMessage(`Error fetching VIP/Faucet data: ${e.message}`, "error");
+            return null;
+        }
+    }
+
+    // --- Event Handlers ---
+
+    /**
+     * Handler untuk tombol login.
+     */
+    function handleLogin() {
+        const val = elements.loginPassword.value.trim();
+        if (!val) {
+            elements.loginErr.textContent = "Password required!";
+            return;
+        }
+        if (val !== AUTH_PASSWORD) {
+            elements.loginErr.textContent = "Wrong password!";
+            return;
+        }
+        elements.modal.style.display = "none";
+        elements.mainContent.style.display = "";
+        loadState(); // Muat data setelah login berhasil
+        setRandomTurnstilePlaceholder(); // Generate initial Turnstile placeholder
+    }
+
+    /**
+     * Handler untuk tombol Connect API.
+     * @param {boolean} [saveNewKey=true] - Apakah key baru harus disimpan/diperbarui.
+     */
+    async function handleConnectAPI(saveNewKey = true) {
+        let inputApiKey = elements.apiKeyInput.value.trim();
+        let useThisKey = saveNewKey ? inputApiKey : currentApiKey;
+
+        if (!useThisKey) {
+            showStatus('API Key required', "error");
+            return;
+        }
+        if (useThisKey.length !== 96) {
+            showStatus('API Key must be 96 characters', "error");
+            return;
+        }
+
+        currentApiKey = useThisKey; // Set global currentApiKey
+        showStatus('Connecting to API...', "info");
+        logMessage("Attempting API connection...", "info");
+
+        let userId = "-", userName = "-", userStatus = "N/A", usdt = "-", viphost = "N/A", faucet = "N/A";
+        let isConnected = false;
+
+        try {
+            const userMeta = await fetchUserMetaData();
+            if (userMeta) {
+                userId = userMeta.id || "-";
+                userName = userMeta.name || "-";
+                userStatus = [
+                    userMeta.isBanned ? "BANNED" : null,
+                    userMeta.isMuted ? "MUTED" : null,
+                    userMeta.isRainproof ? "RAINPROOF" : null,
+                    userMeta.campaignSet ? "CAMPAIGN" : null,
+                    (userMeta.selfExclude && userMeta.selfExclude.active) ? "SELF-EXCLUDED" : null
+                ].filter(Boolean).join(", ") || "Active";
+                logMessage(`UserMeta fetched for ${userName}.`, "success");
+                isConnected = true;
+            } else {
+                throw new Error("Failed to fetch UserMeta (no user data).");
+            }
+        } catch (e) {
+            logMessage(`Initial UserMeta fetch failed: ${e.message}`, "error");
+            showStatus('API connection failed: ' + e.message, "error");
+            // Clear API key in UI if this was a new connection attempt
+            if (saveNewKey) {
+                currentApiKey = null;
+                elements.apiKeyInput.value = '';
+            }
+            return; // Stop further execution if UserMeta fails
+        }
+
+        if (isConnected) {
+            try {
+                const userBalances = await fetchUserBalances();
+                if (userBalances && userBalances.available) {
+                    if (userBalances.available.currency.toLowerCase() === "usdt") {
+                        usdt = userBalances.available.amount;
+                    }
+                    if (userBalances.vault && userBalances.vault.currency.toLowerCase() === "usdt") {
+                        usdt = `${usdt} (Vault: ${userBalances.vault.amount})`;
+                    }
+                    logMessage("UserBalances fetched.", "success");
+                }
+            } catch (e) {
+                logMessage(`Error fetching UserBalances: ${e.message}`, "error");
+            }
+
+            try {
+                const vipFaucetData = await fetchVipFaucetData();
+                if (vipFaucetData) {
+                    if (vipFaucetData.vipInfo && vipFaucetData.vipInfo.host) {
+                        const h = vipFaucetData.vipInfo.host;
+                        viphost = (h.name ? h.name : "-") +
+                            (h.contactHandle ? ` (${h.contactHandle})` : "") +
+                            (h.contactLink ? ` [${h.contactLink}]` : "");
+                    }
+                    if (vipFaucetData.reload) {
+                        const f = vipFaucetData.reload;
+                        faucet = (f.active ? "Active" : "Inactive") + `, Value: ${f.value}`;
+                    }
+                    logMessage("VIP/Faucet data fetched.", "success");
+                }
+            } catch (e) {
+                logMessage(`Error fetching VIP/Faucet data: ${e.message}`, "error");
+            }
+
+            // Update UI
+            elements.userId.textContent = userId;
+            elements.userName.textContent = userName;
+            elements.userStatus.textContent = userStatus;
+            elements.userCredits.textContent = usdt;
+            elements.vipHost.textContent = "VIP Host: " + viphost;
+            elements.faucet.textContent = "Faucet: " + faucet;
+
+            // Add/Update account to list if this was a "Connect" action
+            if (saveNewKey && userName) {
+                const existingAccountIndex = accounts.findIndex(acc => acc.name === userName);
+                if (existingAccountIndex !== -1) {
+                    // Update existing account's API key
+                    accounts[existingAccountIndex].apiKey = currentApiKey;
+                    currentAccountIndex = existingAccountIndex;
+                    logMessage(`API Key updated for existing account '${userName}'.`, "info");
+                } else {
+                    // Add new account
+                    accounts.push({ name: userName, apiKey: currentApiKey });
+                    currentAccountIndex = accounts.length - 1; // Set this new account as active
+                    logMessage(`New account '${userName}' added.`, "info");
+                }
+                saveState();
+                renderAccountSelector(); // Re-render selector and list
+                selectAccount(currentAccountIndex); // Ensure the correct account is selected in dropdown
+            }
+
+            showStatus('API Connected!', "success");
+            logMessage(`Currently active account: ${userName}.`, "info");
+            elements.apiKeyInput.value = ''; // Clear input after successful connect/update
+        }
+    }
+
+    /**
+     * Handler untuk tombol Paste from Clipboard.
+     */
+    async function handlePasteClipboard() {
+        try {
+            const text = await navigator.clipboard.readText();
+            if (text) {
+                elements.apiKeyInput.value = text.trim();
+                showStatus('API Key pasted from clipboard.', "info");
+            } else {
+                showStatus('Clipboard is empty.', "error");
+            }
+        } catch (e) {
+            showStatus('Clipboard not accessible or empty. ' + e.message, "error");
+            logMessage('Clipboard paste error: ' + e.message, "error");
+        }
+    }
+
+    /**
+     * Handler untuk tombol Check Bonus Code Availability.
+     */
+    async function handleCheckBonusAvailability() {
+        if (!currentApiKey) {
+            showStatus('Connect API Key first or select an account', 'error');
+            return;
+        }
+        const code = elements.checkBonusCodeInput.value.trim();
+        if (!code) {
+            showStatus('Input code!', 'error');
+            return;
+        }
+        const couponType = elements.couponTypeSelect.value.toUpperCase(); // Ensure uppercase for ENUM
+
+        showStatus('Checking bonus code...', "info");
+        logMessage(`Checking availability for code: '${code}' (Type: ${couponType})...`, "info");
+
+        const query = `query BonusCodeAvailability($code: String!, $couponType: CouponType!) {
+            bonusCodeAvailability(code: $code, couponType: $couponType)
+        }`;
+        const variables = { code, couponType };
+
+        try {
+            const data = await callGraphQL(query, variables);
+            if (typeof data.bonusCodeAvailability !== "undefined") {
+                const isAvailable = data.bonusCodeAvailability;
+                const statusMessage = `Availability: ${isAvailable ? "Available" : "Not Available"}`;
+                showStatus(statusMessage, isAvailable ? "success" : "error");
+                logMessage(`CheckCode: '${code}' is ${isAvailable ? "AVAILABLE" : "NOT AVAILABLE"}.`, isAvailable ? "success" : "info");
+            } else {
+                showStatus('Unexpected response for bonus availability.', "error");
+                logMessage('Unexpected bonus availability response.', "error");
+            }
+        } catch (e) {
+            showStatus(`Error checking code: ${e.message}`, "error");
+            logMessage(`CheckCode Error: ${e.message}`, "error");
+        }
+    }
+
+    /**
+     * Handler untuk tombol Claim Bonus.
+     */
+    async function handleClaimBonus() {
+        if (!currentApiKey) {
+            showStatus('Connect API Key first or select an account', "error");
+            return;
+        }
+        const code = elements.bonusCodeInput.value.trim();
+        if (!code) {
+            showStatus('Input bonus code', "error");
+            return;
+        }
+        const type = elements.claimTypeSelect.value;
+        const turnstileToken = elements.turnstileTokenInput.value.trim();
+
+        // Regenerate Turnstile token if it's the placeholder, for a new "random" value
+        if (turnstileToken.startsWith("DEMO-TOKEN-")) {
+            setRandomTurnstilePlaceholder();
+            showStatus('Using DEMO Turnstile token. Real claims require valid token!', "error");
+            logMessage('WARNING: Using DEMO Turnstile token. Real claims require valid token!', "error");
+            return; // Hentikan klaim jika masih menggunakan DEMO-TOKEN
+        }
+        
+        showStatus('Claiming bonus...', "info");
+        logMessage(`Attempting to claim bonus: '${code}' (Type: ${type})...`, "info");
+
+        const mutation =
+            type === "ClaimConditionBonusCode"
+            ? `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
+                claimConditionBonusCode(
+                    code: $code
+                    currency: $currency
+                    turnstileToken: $turnstileToken
+                ) {
+                    bonusCode { id code }
+                    amount
+                    currency
+                    user {
+                        id
+                        balances { available { amount currency } vault { amount currency } }
+                    }
+                    redeemed
+                }
+            }`
+            : `mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
+                claimBonusCode(
+                    code: $code
+                    currency: $currency
+                    turnstileToken: $turnstileToken
+                ) {
+                    bonusCode { id code }
+                    amount
+                    currency
+                    user {
+                        id
+                        balances { available { amount currency } vault { amount currency } }
+                    }
+                    redeemed
+                }
+            }`;
+        const variables = { code, currency: "USDT", turnstileToken }; // CurrencyEnum biasanya UPPERCASE
+
+        try {
+            const data = await callGraphQL(mutation, variables);
+            const dataKey = type === "ClaimConditionBonusCode" ? "claimConditionBonusCode" : "claimBonusCode";
+
+            if (data && data[dataKey]) {
+                const claimed = data[dataKey];
+                showStatus(`Claimed: ${claimed.amount} ${claimed.currency}`, "success");
+                logMessage(`CLAIM SUCCESS: '${code}' - Amount: ${claimed.amount} ${claimed.currency}, Redeemed: ${claimed.redeemed}.`, "success");
+
+                const user = claimed.user;
+                if (user && user.balances) {
+                    let usdtBalance = "-";
+                    if (user.balances.available && user.balances.available.currency.toLowerCase() === "usdt") {
+                        usdtBalance = user.balances.available.amount;
+                    }
+                    if (user.balances.vault && user.balances.vault.currency.toLowerCase() === "usdt") {
+                        usdtBalance = `${usdtBalance} (Vault: ${user.balances.vault.amount})`;
+                    }
+                    elements.userCredits.textContent = usdtBalance;
+                }
+            } else {
+                showStatus('Unknown error or response on bonus claim.', "error");
+                logMessage('Unknown bonus claim response.', "error");
+            }
+        } catch (e) {
+            showStatus(`Error on bonus claim: ${e.message}`, "error");
+            logMessage(`CLAIM ERROR: '${code}' - ${e.message}`, "error");
+        } finally {
+            // Generate new placeholder after each claim attempt
+            setRandomTurnstilePlaceholder();
+        }
+    }
+
+    // --- Initialization Function ---
+    function initialize() {
+        // --- CSS Injection ---
+        // Menggunakan GM_addStyle untuk UserScript yang lebih baik
         GM_addStyle(`
             /* Reset dasar dan box-sizing untuk semua elemen di dalam root */
             #fb-claimer-root *, #fb-claimer-root *::before, #fb-claimer-root *::after {
@@ -222,13 +825,25 @@
                 transform: scale(0.95); /* Efek klik */
             }
 
-            /* Form API Key */
+            /* Form API Key dan Account Selector */
+            .api-section-controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                align-items: center;
+                margin-bottom: 15px;
+            }
+            #fb-accountSelector {
+                flex-grow: 1; /* Mengambil ruang yang tersedia */
+                min-width: 150px;
+            }
             .api-form {
                 display: flex;
                 gap: 12px; /* Spasi antar elemen form */
                 margin-top: 15px;
                 flex-wrap: wrap; /* Untuk responsif */
                 align-items: stretch; /* Agar tinggi input/button sama */
+                width: 100%; /* Pastikan form mengambil 100% lebar */
             }
             .api-form input {
                 flex: 1; /* Input mengambil sisa ruang */
@@ -330,6 +945,9 @@
             .success {
                 color: #baff84;
             }
+            .info { /* For log messages */
+                color: #a0a0a0;
+            }
             .log-box {
                 margin-top: 18px;
                 background: #162130;
@@ -349,10 +967,10 @@
             .log-box div:last-child {
                 margin-bottom: 0;
             }
-            .log-box .error {
+            .log-box div.error {
                 color: #ff8a8a;
             }
-            .log-box .success {
+            .log-box div.success {
                 color: #c8ffb3;
             }
 
@@ -374,7 +992,7 @@
                     padding: 15px 20px;
                 }
                 /* Form elemen akan menumpuk secara vertikal */
-                .api-form, .checkcode-form, .claim-form {
+                .api-form, .checkcode-form, .claim-form, .api-section-controls {
                     flex-direction: column;
                     align-items: stretch;
                 }
@@ -394,17 +1012,9 @@
                 }
             }
         `);
-    } else {
-        // Fallback for non-Tampermonkey environments (e.g., direct script inclusion)
-        const style = document.createElement('style');
-        style.textContent = `
-            /* Duplikat CSS di sini jika tidak menggunakan Tampermonkey */
-            /* (Untuk menjaga ukuran file, saya tidak akan menempelkan ulang di sini) */
-        `;
-        document.head.appendChild(style);
     }
 
-    // --- UI HTML root (Rebuilt HTML structure with same IDs) ---
+    // --- UI HTML root (Rebuilt HTML structure with new Account Selector) ---
     const root = document.createElement('div');
     root.id = "fb-claimer-root";
     root.innerHTML = `
@@ -433,13 +1043,24 @@
                 </div>
             </div>
             <div class="fb-claimer-panel">
-                <div class="panel-title">CONNECTED ACCOUNTS</div>
+                <div class="panel-title">ACCOUNT MANAGEMENT</div>
                 <div class="panel-content">
-                    <div id="fb-accounts" class="account-list"></div>
+                    <div class="api-section-controls">
+                        <label for="fb-accountSelector" style="white-space:nowrap;">Select Account:</label>
+                        <select id="fb-accountSelector">
+                            <option value="-1">Loading Accounts...</option>
+                        </select>
+                        <button id="fb-loadSelectedAccount">Load Account</button>
+                    </div>
+
+                    <div id="fb-accounts" class="account-list">
+                        </div>
+                    <hr style="border-color:#3a5067; margin:20px 0;">
+                    
                     <div class="api-form">
-                        <input type="password" id="fb-apiKeyInput" maxlength="96" placeholder="Enter API Key (96 characters)">
+                        <input type="password" id="fb-apiKeyInput" maxlength="96" placeholder="Enter New/Existing API Key (96 chars)">
                         <button id="fb-pasteClipboard" title="Paste from clipboard">📋</button>
-                        <button id="fb-connectAPI">Connect</button>
+                        <button id="fb-connectAPI">Connect/Update Account</button>
                     </div>
                     <div class="api-warning">
                         Please be aware that maintaining multiple accounts may pose risks.
@@ -452,8 +1073,8 @@
                     <div class="checkcode-form">
                         <input type="text" id="fb-checkBonusCode" maxlength="50" placeholder="Check Bonus Code Availability">
                         <select id="fb-couponType">
-                            <option value="bonus">BONUS</option>
-                            <option value="coupon">COUPON</option>
+                            <option value="BONUS">BONUS</option>
+                            <option value="COUPON">COUPON</option>
                         </select>
                         <button id="fb-btnCheckBonus">Check</button>
                     </div>
@@ -467,7 +1088,7 @@
                     </div>
                     <div style="margin-top:15px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                         <label>Turnstile Token:</label>
-                        <input type="text" id="fb-turnstileToken" placeholder="DEMO-TOKEN or real">
+                        <input type="text" id="fb-turnstileToken" placeholder="DEMO-TOKEN-xxxxxxxx">
                     </div>
                     <div class="status" id="fb-status"></div>
                     <div class="log-box" id="fb-log"></div>
@@ -477,446 +1098,60 @@
     `;
     document.body.appendChild(root);
 
-    // --- DOM Element References (Re-map after HTML injection) ---
-    // Pastikan semua referensi elemen diperbarui setelah root.innerHTML diatur
-    const elements = {
-        root: document.getElementById('fb-claimer-root'),
-        modal: document.getElementById('fb-claimer-modal'),
-        loginPassword: document.getElementById('fb-loginPassword'),
-        loginBtn: document.getElementById('fb-loginBtn'),
-        loginErr: document.getElementById('fb-loginErr'),
-        mainContent: document.getElementById('fb-claimer-main'),
-        userId: document.getElementById('fb-userId'),
-        userName: document.getElementById('fb-userName'),
-        userStatus: document.getElementById('fb-userStatus'),
-        userCredits: document.getElementById('fb-userCredits'),
-        vipHost: document.getElementById('fb-viphost'),
-        faucet: document.getElementById('fb-faucet'),
-        accountsList: document.getElementById('fb-accounts'),
-        apiKeyInput: document.getElementById('fb-apiKeyInput'),
-        pasteClipboardBtn: document.getElementById('fb-pasteClipboard'),
-        connectApiBtn: document.getElementById('fb-connectAPI'),
-        checkBonusCodeInput: document.getElementById('fb-checkBonusCode'),
-        couponTypeSelect: document.getElementById('fb-couponType'),
-        btnCheckBonus: document.getElementById('fb-btnCheckBonus'),
-        bonusCodeInput: document.getElementById('fb-bonusCodeInput'),
-        claimTypeSelect: document.getElementById('fb-claimType'),
-        claimBonusBtn: document.getElementById('fb-claimBonus'),
-        turnstileTokenInput: document.getElementById('fb-turnstileToken'),
-        statusDisplay: document.getElementById('fb-status'),
-        logBox: document.getElementById('fb-log'),
-    };
+    // --- Map DOM elements to references after they are added to the DOM ---
+    elements.modal = document.getElementById('fb-claimer-modal');
+    elements.loginPassword = document.getElementById('fb-loginPassword');
+    elements.loginBtn = document.getElementById('fb-loginBtn');
+    elements.loginErr = document.getElementById('fb-loginErr');
+    elements.mainContent = document.getElementById('fb-claimer-main');
+    elements.userId = document.getElementById('fb-userId');
+    elements.userName = document.getElementById('fb-userName');
+    elements.userStatus = document.getElementById('fb-userStatus');
+    elements.userCredits = document.getElementById('fb-userCredits');
+    elements.vipHost = document.getElementById('fb-viphost');
+    elements.faucet = document.getElementById('fb-faucet');
+    elements.accountsList = document.getElementById('fb-accounts');
+    elements.accountSelector = document.getElementById('fb-accountSelector'); // New element
+    elements.loadSelectedAccountBtn = document.getElementById('fb-loadSelectedAccount'); // New element
+    elements.apiKeyInput = document.getElementById('fb-apiKeyInput');
+    elements.pasteClipboardBtn = document.getElementById('fb-pasteClipboard');
+    elements.connectApiBtn = document.getElementById('fb-connectAPI');
+    elements.checkBonusCodeInput = document.getElementById('fb-checkBonusCode');
+    elements.couponTypeSelect = document.getElementById('fb-couponType');
+    elements.btnCheckBonus = document.getElementById('fb-btnCheckBonus');
+    elements.bonusCodeInput = document.getElementById('fb-bonusCodeInput');
+    elements.claimTypeSelect = document.getElementById('fb-claimType');
+    elements.claimBonusBtn = document.getElementById('fb-claimBonus');
+    elements.turnstileTokenInput = document.getElementById('fb-turnstileToken');
+    elements.statusDisplay = document.getElementById('fb-status');
+    elements.logBox = document.getElementById('fb-log');
 
-    // --- STATE (Original logic remains) ---
-    let accountList = []; // Mulai kosong, akan dimuat dari storage
-    let apiKey = null;
-
-    // --- RENDER ACCOUNTS (Original logic remains) ---
-    function renderAccounts() {
-        const wrap = elements.accountsList; // Menggunakan referensi elements
-        wrap.innerHTML = "";
-        if (accountList.length === 0) {
-            wrap.innerHTML = "<div style='color:#a0a0a0; font-size:0.9em; text-align:center; padding:10px 0;'>No accounts connected yet.</div>";
-        }
-        accountList.forEach((acc, idx) => {
-            const div = document.createElement('div');
-            div.className = "account-item";
-            div.innerHTML = `
-                <span class="label">${acc.name}</span>
-                <span class="btns">
-                    <button title="Settings" data-idx="${idx}" class="fb-set">⚙️</button>
-                    <button title="Delete" data-idx="${idx}" class="fb-del">🗑️</button>
-                </span>
-            `;
-            wrap.appendChild(div);
-        });
-        wrap.querySelectorAll('.fb-del').forEach(btn => {
-            btn.onclick = function() {
-                const index = Number(btn.dataset.idx);
-                if (confirm(`Are you sure you want to delete account: ${accountList[index].name}?`)) {
-                    accountList.splice(index, 1);
-                    saveState(); // Simpan perubahan setelah hapus
-                    renderAccounts();
-                    log("Account deleted.");
-                }
-            };
-        });
-        wrap.querySelectorAll('.fb-set').forEach(btn => {
-            btn.onclick = function() {
-                alert('Setting for ' + accountList[Number(btn.dataset.idx)].name);
-            };
-        });
-    }
-
-    // --- Helper Functions (Original logic remains, adapted to elements object) ---
-    function showStatus(msg, type = null) {
-        const s = elements.statusDisplay; // Menggunakan referensi elements
-        s.textContent = msg;
-        s.className = "status" + (type ? (" " + type) : "");
-    }
-    function log(msg) {
-        const logDiv = elements.logBox; // Menggunakan referensi elements
-        logDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${msg}</div>`;
-        logDiv.scrollTop = logDiv.scrollHeight;
-    }
-
-    // --- Data Persistence (GM_getValue/GM_setValue for UserScript) ---
-    function loadState() {
-        const storedAccounts = GM_getValue(LOCAL_STORAGE_KEY_ACCOUNTS, '[]');
-        try {
-            accountList = JSON.parse(storedAccounts);
-        } catch (e) {
-            log("Error loading accounts from storage: " + e.message);
-            accountList = []; // Reset jika ada error parsing
-        }
-        apiKey = GM_getValue(LOCAL_STORAGE_KEY_API_KEY, null);
-        if (apiKey) {
-            elements.apiKeyInput.value = apiKey; // Populate input if key exists
-        }
-        renderAccounts();
-    }
-
-    function saveState() {
-        GM_setValue(LOCAL_STORAGE_KEY_ACCOUNTS, JSON.stringify(accountList));
-        if (apiKey) {
-            GM_setValue(LOCAL_STORAGE_KEY_API_KEY, apiKey);
-        } else {
-            GM_deleteValue(LOCAL_STORAGE_KEY_API_KEY);
-        }
-    }
-
-
-    // --- LOGIN (Original logic remains, adapted to elements object) ---
-    elements.loginBtn.onclick = function() {
-        const val = elements.loginPassword.value.trim();
-        if (!val) {
-            elements.loginErr.textContent = "Password required!";
-            return;
-        }
-        if (val !== AUTH_PASSWORD) {
-            elements.loginErr.textContent = "Wrong password!";
-            return;
-        }
-        elements.modal.style.display = "none";
-        elements.mainContent.style.display = "";
-        loadState(); // Muat state setelah login
-    };
-    elements.loginPassword.addEventListener('keydown', function(e) {
-        if (e.key === "Enter") elements.loginBtn.click();
+    // --- Attach Event Listeners ---
+    elements.loginBtn.onclick = handleLogin;
+    elements.loginPassword.addEventListener('keydown', (e) => {
+        if (e.key === "Enter") handleLogin();
+    });
+    elements.connectApiBtn.onclick = () => handleConnectAPI(true); // Always save/update when clicking "Connect"
+    elements.loadSelectedAccountBtn.onclick = () => selectAccount(Number(elements.accountSelector.value));
+    elements.accountSelector.onchange = (e) => selectAccount(Number(e.target.value)); // Langsung ganti akun saat dipilih
+    elements.pasteClipboardBtn.onclick = handlePasteClipboard;
+    elements.btnCheckBonus.onclick = handleCheckBonusAvailability;
+    elements.claimBonusBtn.onclick = handleClaimBonus;
+    elements.bonusCodeInput.addEventListener('keydown', (e) => {
+        if (e.key === "Enter") handleClaimBonus();
     });
 
-    // --- CONNECT API (Original logic remains, adapted to elements object) ---
-    elements.connectApiBtn.onclick = async function() {
-        const input = elements.apiKeyInput.value.trim();
-        if (!input) return showStatus('API Key required', "error");
-        if (input.length !== 96) return showStatus('API Key must be 96 chars', "error");
-        apiKey = input; // Set global apiKey state
-        saveState(); // Simpan API key
-        showStatus('Connecting to API...');
-        log("Connecting to API...");
-
-        // 1. UserMeta
-        let userId = "-", userName = "-", userStatus = "";
-        try {
-            const query = `
-            query UserMeta($name: String, $signupCode: Boolean = false) {
-                user(name: $name) {
-                    id
-                    name
-                    isMuted
-                    isRainproof
-                    isBanned
-                    createdAt
-                    campaignSet
-                    selfExclude { id status active createdAt expireAt }
-                    signupCode @include(if: $signupCode) { id code { id code } }
-                }
-            }`;
-            const res = await fetch(API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "x-access-token": apiKey },
-                body: JSON.stringify({ query, variables: { name: null, signupCode: false } })
-            });
-            const json = await res.json();
-            if (json.data && json.data.user) {
-                const u = json.data.user;
-                userId = u.id || "-";
-                userName = u.name || "-";
-                userStatus = [
-                    u.isBanned ? "BANNED" : null,
-                    u.isMuted ? "MUTED" : null,
-                    u.isRainproof ? "RAINPROOF" : null,
-                    u.campaignSet ? "CAMPAIGN" : null,
-                    (u.selfExclude && u.selfExclude.active) ? "SELF-EXCLUDED" : null
-                ].filter(Boolean).join(", ") || "Active"; // Tambahkan "Active" jika tidak ada status lain
-                log("UserMeta fetched successfully.");
-
-                // Tambahkan akun ke accountList jika belum ada
-                if (userName && !accountList.some(acc => acc.name === userName)) {
-                    accountList.push({ name: userName, apiKey: apiKey }); // Simpan API key bersama akun
-                    saveState();
-                    renderAccounts();
-                    log(`Account '${userName}' added to list.`);
-                }
-
-            } else if (json.errors && json.errors.length) {
-                throw new Error(json.errors[0].message);
-            } else {
-                throw new Error("Failed to fetch user meta.");
-            }
-        } catch (e) {
-            log("UserMeta error: " + e.message);
-            showStatus('API connection failed: ' + e.message, "error");
-            apiKey = null; // Clear API key on failure
-            elements.apiKeyInput.value = ''; // Clear input
-            return; // Stop further execution if UserMeta fails
-        }
-
-        // 2. UserBalances
-        let usdt = "-";
-        try {
-            const query = `
-            query UserBalances {
-                user {
-                    id
-                    balances {
-                        available { amount currency }
-                        vault { amount currency }
-                    }
-                }
-            }`;
-            const res = await fetch(API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "x-access-token": apiKey },
-                body: JSON.stringify({ query })
-            });
-            const json = await res.json();
-            if (json.data && json.data.user && json.data.user.balances) {
-                // GraphQL schema menunjukkan balances sebagai objek, bukan array, dengan available dan vault langsung
-                // Ubah logika akses jika json.data.user.balances bukan array
-                const userBalances = json.data.user.balances;
-                if (userBalances.available && userBalances.available.currency.toLowerCase() === "usdt") {
-                    usdt = userBalances.available.amount;
-                }
-                if (userBalances.vault && userBalances.vault.currency.toLowerCase() === "usdt") {
-                    usdt = `${usdt} (Vault: ${userBalances.vault.amount})`;
-                }
-                log("UserBalances fetched successfully.");
-            } else if (json.errors && json.errors.length) {
-                throw new Error(json.errors[0].message);
-            }
-        } catch (e) {
-            log("UserBalances error: " + e.message);
-        }
-
-        // 3. VIP / Faucet (Original query did not have variables in its definition)
-        let viphost = "-", faucet = "-";
-        try {
-            const query = `
-            query VipMeta {
-                user {
-                    vipInfo {
-                        host { name contactHandle contactLink email availableDays }
-                    }
-                    reload: faucet { value active }
-                }
-            }`;
-            const res = await fetch(API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "x-access-token": apiKey },
-                body: JSON.stringify({ query }) // Tidak ada variables untuk VipMeta sesuai skema yang Anda berikan sebelumnya
-            });
-            const json = await res.json();
-            if (json.data && json.data.user) {
-                if (json.data.user.vipInfo && json.data.user.vipInfo.host) {
-                    const h = json.data.user.vipInfo.host;
-                    viphost = (h.name ? h.name : "-") +
-                        (h.contactHandle ? " (" + h.contactHandle + ")" : "") +
-                        (h.contactLink ? " [" + h.contactLink + "]" : "");
-                }
-                if (json.data.user.reload) {
-                    const f = json.data.user.reload;
-                    faucet = (f.active ? "Active" : "Inactive") + ", Value: " + f.value;
-                }
-                log("VIP/Faucet data fetched successfully.");
-            } else if (json.errors && json.errors.length) {
-                throw new Error(json.errors[0].message);
-            }
-        } catch (e) {
-            log("VipMeta error: " + e.message);
-        }
-
-        // Update UI
-        elements.userId.textContent = userId;
-        elements.userName.textContent = userName;
-        elements.userStatus.textContent = userStatus;
-        elements.userCredits.textContent = usdt;
-        elements.vipHost.textContent = "VIP Host: " + viphost;
-        elements.faucet.textContent = "Faucet: " + faucet;
-
-        showStatus('API Connected!', "success");
-        log("Connected as " + userName);
-        elements.apiKeyInput.value = ''; // Clear input after successful connection
-    };
-
-    // Paste clipboard (Original logic remains, adapted to elements object)
-    elements.pasteClipboardBtn.onclick = async function() {
-        try {
-            const text = await navigator.clipboard.readText();
-            elements.apiKeyInput.value = text || '';
-            if (text) {
-                showStatus('API Key pasted from clipboard.', "info");
-                log("Pasted API Key from clipboard.");
-            } else {
-                showStatus('Clipboard is empty.', "error");
-            }
-        } catch (e) {
-            showStatus('Clipboard not accessible or empty', "error");
-            log('Clipboard error: ' + e.message);
-        }
-    };
-
-    // --- CHECK BONUS CODE AVAILABILITY (Original logic remains, adapted to elements object) ---
-    elements.btnCheckBonus.onclick = async function() {
-        if (!apiKey) return showStatus('Connect API Key first', 'error');
-        const code = elements.checkBonusCodeInput.value.trim();
-        if (!code) return showStatus('Input code!', 'error');
-        let couponType = elements.couponTypeSelect.value;
-        couponType = couponType.toUpperCase(); // Ensure uppercase for CouponType Enum as per GraphQL schema
-        const query = `query BonusCodeAvailability($code: String!, $couponType: CouponType!) {
-            bonusCodeAvailability(code: $code, couponType: $couponType)
-        }`;
-        const variables = { code, couponType };
-        showStatus('Checking code availability...', "info");
-        log(`Checking bonus code: ${code} (Type: ${couponType})...`);
-        try {
-            const res = await fetch(API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "x-access-token": apiKey },
-                body: JSON.stringify({ query, variables })
-            });
-            const json = await res.json();
-            if (json.data && typeof json.data.bonusCodeAvailability !== "undefined") {
-                const statusType = json.data.bonusCodeAvailability ? "success" : "error";
-                showStatus("Availability: " + (json.data.bonusCodeAvailability ? "Available" : "Not Available"), statusType);
-                log("CheckCode: " + code + " = " + json.data.bonusCodeAvailability);
-            } else if (json.errors && json.errors.length) {
-                showStatus(json.errors[0].message, "error");
-                log("CheckCode Error: " + json.errors[0].message);
-            } else {
-                showStatus('Unknown error checking bonus availability.', "error");
-                log("Unknown response for bonus availability check.");
-            }
-        } catch (e) {
-            showStatus('Error checking code: ' + e.message, "error");
-            log('CheckCode Error: ' + e.message);
-        }
-    };
-
-    // --- CLAIM BONUS (Original logic remains, adapted to elements object) ---
-    elements.claimBonusBtn.onclick = async function() {
-        if (!apiKey) return showStatus('Connect API Key first', "error");
-        const code = elements.bonusCodeInput.value.trim();
-        if (!code) return showStatus('Input bonus code', "error");
-        const type = elements.claimTypeSelect.value;
-        const turnstileToken = elements.turnstileTokenInput.value.trim() || "DEMO-TOKEN";
-
-        showStatus('Claiming bonus...', "info");
-        log(`Attempting to claim bonus: ${code} (Type: ${type})...`);
-
-        const mutation =
-            type === "ClaimConditionBonusCode"
-            ? `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
-                claimConditionBonusCode(
-                    code: $code
-                    currency: $currency
-                    turnstileToken: $turnstileToken
-                ) {
-                    bonusCode { id code }
-                    amount
-                    currency
-                    user {
-                        id
-                        balances { available { amount currency } vault { amount currency } }
-                    }
-                    redeemed
-                }
-            }`
-            : `mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
-                claimBonusCode(
-                    code: $code
-                    currency: $currency
-                    turnstileToken: $turnstileToken
-                ) {
-                    bonusCode { id code }
-                    amount
-                    currency
-                    user {
-                        id
-                        balances { available { amount currency } vault { amount currency } }
-                    }
-                    redeemed
-                }
-            }`;
-        const variables = { code, currency: "USDT", turnstileToken }; // CurrencyEnum biasanya UPPERCASE
-
-        try {
-            const res = await fetch(API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "x-access-token": apiKey },
-                body: JSON.stringify({ query: mutation, variables })
-            });
-            const json = await res.json();
-            const dataKey = type === "ClaimConditionBonusCode" ? "claimConditionBonusCode" : "claimBonusCode";
-
-            if (json.data && json.data[dataKey]) {
-                const claimed = json.data[dataKey];
-                showStatus(`Claimed: ${claimed.amount} ${claimed.currency}`, "success");
-                log(`CLAIM SUCCESS: ${code} - Amount: ${claimed.amount} ${claimed.currency}, Redeemed: ${claimed.redeemed}.`);
-
-                // Update USDT balance from the returned user object
-                const user = claimed.user;
-                if (user && user.balances) {
-                    let usdtBalance = "-";
-                    // Correctly access balances as an object with available/vault
-                    if (user.balances.available && user.balances.available.currency.toLowerCase() === "usdt") {
-                        usdtBalance = user.balances.available.amount;
-                    }
-                    if (user.balances.vault && user.balances.vault.currency.toLowerCase() === "usdt") {
-                        usdtBalance = `${usdtBalance} (Vault: ${user.balances.vault.amount})`;
-                    }
-                    elements.userCredits.textContent = usdtBalance;
-                }
-            } else if (json.errors && json.errors.length) {
-                showStatus(json.errors[0].message, "error");
-                log("CLAIM ERROR: " + code + " - " + json.errors[0].message);
-            } else {
-                showStatus('Unknown error on bonus claim.', "error");
-                log("Unknown response for bonus claim.");
-            }
-        } catch (e) {
-            showStatus('Error on bonus claim: ' + e.message, "error");
-            log('CLAIM Error: ' + e.message);
-        }
-    };
-    elements.bonusCodeInput.addEventListener('keydown', function(e) {
-        if (e.key === "Enter") elements.claimBonusBtn.click();
-    });
-
-    // --- Initialization Function ---
-    function initialize() {
-        // HTML Injection (already done above)
-        // DOM element mapping (already done above)
-        // Event Listeners (already done above)
-
-        // Initial state load
-        loadState(); // This will also call renderAccounts()
-    }
-
-    // Run initialization when DOM is ready
+    // --- Initialization ---
+    // Jalankan fungsi inisialisasi ketika DOM sudah siap
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initialize);
     } else {
         initialize();
+    }
+
+    function initialize() {
+        // Initials loads and settings
+        setRandomTurnstilePlaceholder(); // Generate a placeholder on load
+        // Initial state load is now called after successful login
     }
 })();
