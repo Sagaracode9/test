@@ -23,7 +23,7 @@
   `;
   var html = `
     <div class="center">
-      <h2>Sabot™ Claimer</h2>
+      <h2>FvckinBot™ Claimer</h2>
       <div id="statusLine" class="mb-2">Status: <span id="statusText">Not connected</span></div>
       <div id="userInfo" class="mb-2">
         User ID: <span id="userId">-</span> | Credits: <span id="userCredits">-</span>
@@ -156,13 +156,11 @@
     if (!res.ok) throw new Error(`${res.statusText} (${res.status})`);
     return res.json();
   }
+  // -- Query diperbaiki: Tidak ada variabel signupCode yang tidak dipakai
   async function fetchUsername(apiKey) {
     try {
       const data = await graphqlFetch(apiKey, {
-        variables: { signupCode: true },
-        query: `query UserMeta($name: String, $signupCode: Boolean = false) {
-          user(name: $name) { id name }
-        }`
+        query: `query UserMeta { user { id name } }`
       });
       return data.data.user.name;
     } catch { return null; }
