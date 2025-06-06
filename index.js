@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         saBot Claimer MultiAccount [FIX ENUM + MULTI + TURNSTILE]
+// @name         saBot Claimer Modern UI
 // @namespace    http://tampermonkey.net/
-// @version      1.3
-// @description  Fix enum GraphQL, multi akun, random turnstile, auto nama Stake, UI siap tempel!
+// @version      1.5
+// @description  Multi akun, turnstile random, modern UI, siap tempel. Berdasarkan script asli + request UI improvement by user
 // @author       Gemini AI
 // @match        https://stake.com/*
 // @grant        GM_addStyle
@@ -15,8 +15,204 @@
   const AUTH_PASSWORD = "sagara321";
   const LS_ACCOUNTS = "sb_accs";
 
-  // --- CSS
-  if (typeof GM_addStyle !== 'undefined') GM_addStyle(`#fb-claimer-root *{box-sizing:border-box;font-family:monospace;}#fb-claimer-root{all:unset;position:fixed;top:0;left:0;width:100vw;min-height:100vh;z-index:99999;background:#151c23;color:#e0e0e0;}.fb-claimer-panel{background:#223447;margin-top:28px;border-radius:12px;padding:0 0 24px 0;box-shadow:0 2px 16px #0009;}#fb-claimer-modal{background:#223447e9;position:fixed;left:0;top:0;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;z-index:1000;}#fb-claimer-modal .popup-inner{background:#253a50;padding:36px 28px;border-radius:13px;min-width:260px;max-width:95vw;box-shadow:0 6px 36px #000b;}#fb-claimer-header{background:#212f3d;padding:18px 32px;font-size:1.7em;border-radius:0 0 14px 14px;display:flex;justify-content:space-between;align-items:center;}#fb-claimer-main{max-width:700px;margin:36px auto 60px auto;}.fb-claimer-panel .panel-title{background:#2488ff;color:#fff;font-weight:bold;border-radius:12px 12px 0 0;padding:13px 24px;font-size:1.12em;letter-spacing:1px;}.panel-content{padding:20px 24px 0 24px;}.account-list{margin-bottom:12px;}.account-item{background:#2d4250;border-radius:7px;padding:9px 13px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;font-size:1em;}.account-item .label{font-weight:600;color:#baff84;}.account-item .btns button{border:none;background:transparent;font-size:1.15em;cursor:pointer;margin-left:7px;}input,select{background:#1a2c38;border:1px solid #304158;border-radius:7px;color:#fcf259;font-family:inherit;font-size:15px;padding:7px;margin-top:7px;width:90%;}button{background:#1475e1;color:#fff;border:none;border-radius:9px;padding:9px 21px;font-weight:bold;cursor:pointer;margin-top:14px;margin-right:10px;transition:background .2s;}button:hover{background:#0d437c;}.status{margin-top:16px;font-size:15px;color:#fcf259;}.error{color:#ff6767;}.success{color:#baff84;}.log-box{margin-top:13px;background:#162130;border-radius:7px;padding:8px 12px;font-size:.93em;min-height:36px;max-height:180px;overflow:auto;}@media(max-width:700px){#fb-claimer-main{max-width:99vw;}}`);
+  // --- MODERN CSS ---
+  if (typeof GM_addStyle !== 'undefined') GM_addStyle(`
+#fb-claimer-root * {
+  box-sizing: border-box;
+  font-family: 'Fira Mono', monospace;
+  letter-spacing: 0.01em;
+}
+#fb-claimer-root {
+  all: unset;
+  position: fixed;
+  top: 0; left: 0; width: 100vw; min-height: 100vh;
+  z-index: 99999;
+  background: linear-gradient(135deg, #19223c 0%, #192b35 100%);
+  color: #ececec;
+}
+.fb-claimer-panel {
+  background: #212f3d;
+  margin-top: 34px;
+  border-radius: 20px;
+  padding: 0 0 24px 0;
+  box-shadow: 0 6px 30px #000a, 0 0px 1px #17313b;
+  transition: box-shadow .15s;
+}
+#fb-claimer-modal {
+  background:rgba(28,38,54,0.98);
+  position:fixed;left:0;top:0;width:100vw;height:100vh;
+  display:flex;align-items:center;justify-content:center;z-index:1000;
+}
+#fb-claimer-modal .popup-inner {
+  background: #273851;
+  padding: 42px 30px;
+  border-radius: 19px;
+  min-width: 260px;max-width:94vw;
+  box-shadow:0 12px 64px #000e;
+  border: 1.5px solid #3a5067;
+  text-align:center;
+}
+#fb-loginPassword, #fb-apiKeyInput, #fb-checkBonusCode, #fb-bonusCodeInput, #fb-turnstileToken {
+  width: 100%;
+  padding: 15px 19px;
+  margin-bottom: 17px;
+  border-radius: 11px;
+  border: 1.5px solid #3a5067;
+  background: #1b2534;
+  color: #fff9;
+  font-size: 1em;
+  transition: border .15s;
+  outline: none;
+}
+#fb-loginPassword:focus, #fb-apiKeyInput:focus, #fb-checkBonusCode:focus, #fb-bonusCodeInput:focus, #fb-turnstileToken:focus {
+  border-color: #4cdd7f;
+  background: #232c3d;
+  color: #baff84;
+}
+#fb-loginBtn, #fb-connectAPI, #fb-btnCheckBonus, #fb-claimBonus, .account-item .fb-del {
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(91deg,#1c61d5,#3bc1f5 90%);
+  color: #fff;
+  padding: 13px 22px;
+  font-weight: 700;
+  font-size:1.08em;
+  cursor:pointer;
+  margin-bottom: 7px;
+  box-shadow:0 1px 7px #0003;
+  transition:background .18s,box-shadow .18s,transform .12s;
+}
+#fb-loginBtn:hover, #fb-connectAPI:hover, #fb-btnCheckBonus:hover, #fb-claimBonus:hover, .account-item .fb-del:hover {
+  background: linear-gradient(91deg,#45a6e4,#33eea2 95%);
+  color:#223447;
+  box-shadow:0 3px 20px #06fae744,0 1px 7px #0003;
+  transform:translateY(-1px) scale(1.03);
+}
+#fb-claimer-header {
+  background: #232f41;
+  padding: 23px 44px;
+  font-size: 2.1em;
+  border-radius: 0 0 24px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 14px #0005;
+  position: sticky;top:0;z-index:9;
+}
+#fb-claimer-title { font-weight: bold; color: #8cffd1; font-size:1.1em; }
+#fb-claimer-site { font-size: 0.7em; color: #fff9; letter-spacing: 0.03em;}
+#fb-claimer-main { max-width: 740px; margin: 38px auto 68px auto; }
+.fb-claimer-panel .panel-title {
+  background:linear-gradient(93deg,#2377e7,#7dfcbe 95%);
+  color: #162130;
+  font-weight: bold;
+  border-radius: 20px 20px 0 0;
+  padding: 16px 34px;
+  font-size: 1.14em;
+  letter-spacing: 1px;
+  box-shadow: 0 2px 10px #0003;
+  font-family: inherit;
+}
+.panel-content { padding: 24px 29px 0 29px; }
+.user-info { margin-bottom:13px; font-size:1.14em; }
+.user-info div { margin-bottom:10px; }
+.user-status-row { font-size:.99em; color:#ffd54f; margin-top:7px; font-weight:600;}
+.fb-viphost, .fb-faucet { font-size:.93em; color:#ffe7a4; margin-top:8px; }
+.account-list { margin-bottom:16px; }
+.account-item {
+  background: #223447;
+  border-radius: 13px;
+  padding: 13px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size:1em;
+  border:2px solid transparent;
+  box-shadow:0 1px 9px #0002;
+  transition:background .15s,border .13s;
+}
+.account-item.active, .account-item.active:hover {
+  background: #173853;
+  border-color: #43ffbe;
+  color:#d6fffd;
+}
+.account-item .label { font-weight: 700; color: #84ffe5; letter-spacing:.01em; }
+.account-item .btns button {
+  border:none;background:transparent;font-size:1.25em;cursor:pointer;margin-left:7px;color:#8cf;opacity:.75;
+  transition:color .12s,opacity .15s;
+}
+.account-item .btns button:hover {color:#fb7979;opacity:1;}
+.api-form { display: flex; gap: 9px; margin-top: 15px; align-items: stretch;}
+.api-form input { flex:1; }
+.api-warning {
+  color: #ffe892;
+  font-size: 0.97em;
+  margin-top: 9px;
+  padding: 9px 13px;
+  background: rgba(255, 232, 146, 0.09);
+  border-left: 3px solid #ffe892;
+  border-radius: 5px;
+}
+.section-title {
+  font-weight: bold;
+  margin-top: 28px;
+  margin-bottom: 15px;
+  font-size: 1.12em;
+  color: #9effc3;
+}
+.checkcode-form, .claim-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+.checkcode-form input, .claim-form input, .claim-form select, .checkcode-form select {
+  min-width: 120px;
+  margin-bottom: 0;
+}
+.claim-form label { white-space:nowrap; color: #ececec;}
+#fb-turnstileToken { width:70%;margin-left:9px;margin-bottom:0;}
+.status {
+  margin: 17px 0 0 0;
+  font-size:1.1em;
+  color:#fcf259;
+  min-height:28px;
+  font-weight:600;
+  text-align:center;
+  padding: 4px 0;
+  letter-spacing:0.03em;
+  border-radius:8px;
+  background:rgba(255,255,180,0.05);
+}
+.error { color:#ff6767;background:rgba(255,50,50,0.07);}
+.success { color:#43ffbe;background:rgba(55,255,200,0.09);}
+.log-box {
+  margin-top: 17px;
+  background: #172537;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 0.97em;
+  min-height: 60px;
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1.5px solid #284e7d;
+  color: #b2e7e9;
+  line-height: 1.65;
+  letter-spacing:0.01em;
+}
+.log-box div {margin-bottom:4px;}
+.log-box div:last-child {margin-bottom:0;}
+@media (max-width:700px){
+  #fb-claimer-main{max-width:99vw;}
+  .fb-claimer-panel{padding-left:0;padding-right:0;}
+  #fb-claimer-header{padding: 13px 12px;font-size:1.11em;}
+  .panel-content{padding: 11px 7vw 0 7vw;}
+  .user-info{font-size:.98em;}
+  .fb-claimer-panel .panel-title{font-size:.97em;padding:8px 10vw;}
+}
+  `);
 
   // --- HTML
   const root = document.createElement('div');
@@ -24,8 +220,8 @@
   root.innerHTML = `
     <div id="fb-claimer-modal"><div class="popup-inner">
       <h3 style="margin:0 0 14px 0; color:#FCF259;">Enter Password</h3>
-      <input type="password" id="fb-loginPassword" maxlength="100" style="width:100%; margin-bottom:15px;" placeholder="Enter Password">
-      <button id="fb-loginBtn" style="width:100%;margin-bottom:10px;">Login</button>
+      <input type="password" id="fb-loginPassword" maxlength="100" placeholder="Enter Password">
+      <button id="fb-loginBtn">Login</button>
       <div id="fb-loginErr" style="color:#ff6767; min-height:20px;"></div>
     </div></div>
     <div id="fb-claimer-header"><span id="fb-claimer-title">saBot Claimer</span><span id="fb-claimer-site">Site: stake.bet</span></div>
@@ -85,18 +281,15 @@
   `;
   document.body.appendChild(root);
 
-  // --- STATE
+  // --- STATE & LOGIC (tidak diubah dari versi fix-mu, tapi dengan highlight akun terakhir)
   let accounts = [];
   let activeApiKey = null;
 
-  // --- Storage
   function loadAccounts() {
       try { accounts = JSON.parse(GM_getValue(LS_ACCOUNTS, "[]")); } catch { accounts = []; }
       renderAccounts();
   }
   function saveAccounts() { GM_setValue(LS_ACCOUNTS, JSON.stringify(accounts)); }
-
-  // --- UI helpers
   function showStatus(msg, type = null) {
       const s = document.getElementById('fb-status');
       s.textContent = msg;
@@ -107,8 +300,6 @@
       logDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${msg}</div>`;
       logDiv.scrollTop = logDiv.scrollHeight;
   }
-
-  // --- Render Account List
   function renderAccounts() {
       const wrap = document.getElementById('fb-accounts');
       wrap.innerHTML = "";
@@ -116,7 +307,7 @@
           wrap.innerHTML = "<div style='color:#a0a0a0; font-size:0.9em; text-align:center; padding:10px 0;'>No accounts connected yet.</div>";
       accounts.forEach((acc, idx) => {
           const div = document.createElement('div');
-          div.className = "account-item";
+          div.className = "account-item" + (activeApiKey && acc.apiKey === activeApiKey ? " active" : "");
           div.innerHTML = `
               <span class="label">${acc.name || "(Unnamed)"}</span>
               <span class="btns">
@@ -134,8 +325,6 @@
           };
       });
   }
-
-  // --- Random Turnstile Token Generator
   function randTurnstileToken() {
       const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
       let token = "0.";
@@ -143,7 +332,6 @@
       return token;
   }
 
-  // --- Login
   document.getElementById('fb-loginBtn').onclick = function() {
       const val = document.getElementById('fb-loginPassword').value.trim();
       if (!val) return document.getElementById('fb-loginErr').textContent = "Password required!";
@@ -156,7 +344,6 @@
       if (e.key === "Enter") document.getElementById('fb-loginBtn').click();
   });
 
-  // --- Connect API & Load Data (VIP meta TANPA variables!)
   document.getElementById('fb-connectAPI').onclick = async function() {
       const input = document.getElementById('fb-apiKeyInput').value.trim();
       if (!input) return showStatus('API Key required', "error");
@@ -165,7 +352,6 @@
       showStatus('Connecting to API...');
       let userId = "-", userName = "-", userStatus = "";
       try {
-          // 1. UserMeta (untuk nama akun, dsb)
           const query = `query UserMeta($name: String, $signupCode: Boolean = false) {
               user(name: $name) {
                 id name isMuted isRainproof isBanned createdAt campaignSet
@@ -190,7 +376,6 @@
                   u.campaignSet ? "CAMPAIGN" : null,
                   (u.selfExclude && u.selfExclude.active) ? "SELF-EXCLUDED" : null
               ].filter(Boolean).join(", ");
-              // Tambah account (unique by name)
               if (userName && !accounts.some(a => a.name === userName)) {
                   accounts.push({ name: userName, apiKey: activeApiKey });
                   saveAccounts();
@@ -202,7 +387,6 @@
           activeApiKey = null; document.getElementById('fb-apiKeyInput').value = '';
           return;
       }
-      // 2. UserBalances
       let usdt = "-";
       try {
           const query = `query UserBalances { user { id balances { available { amount currency } vault { amount currency } } } }`;
@@ -218,7 +402,6 @@
               if (bal.vault && bal.vault.currency?.toLowerCase() === "usdt") usdt += ` (Vault: ${bal.vault.amount})`;
           }
       } catch (e) { log("UserBalances error: "+e.message); }
-      // 3. VIP / Faucet (NO variables!)
       let viphost = "-", faucet = "-";
       try {
           const query = `query VipMeta {
@@ -246,7 +429,6 @@
               }
           }
       } catch (e) {}
-      // Update UI
       document.getElementById('fb-userId').textContent = userId;
       document.getElementById('fb-userName').textContent = userName;
       document.getElementById('fb-userStatus').textContent = userStatus;
@@ -255,9 +437,9 @@
       document.getElementById('fb-faucet').textContent = "Faucet: " + faucet;
       showStatus('API Connected!', "success");
       document.getElementById('fb-apiKeyInput').value = '';
+      renderAccounts();
   };
 
-  // Paste clipboard
   document.getElementById('fb-pasteClipboard').onclick = async function() {
       try {
           const text = await navigator.clipboard.readText();
@@ -265,13 +447,12 @@
       } catch { showStatus('Clipboard not accessible', "error"); }
   };
 
-  // --- CHECK BONUS CODE AVAILABILITY (enum selalu lowercase)
   document.getElementById('fb-btnCheckBonus').onclick = async function() {
       if (!activeApiKey) return showStatus('Connect API Key first', 'error');
       const code = document.getElementById('fb-checkBonusCode').value.trim();
       if (!code) return showStatus('Input code!', 'error');
       let couponType = document.getElementById('fb-couponType').value;
-      couponType = couponType.toLowerCase(); // PATCH: enum harus lowercase
+      couponType = couponType.toLowerCase();
       const query = `query BonusCodeAvailability($code: String!, $couponType: CouponType!) {
         bonusCodeAvailability(code: $code, couponType: $couponType)
       }`;
@@ -293,7 +474,6 @@
       } catch (e) { showStatus('Error checking code', "error"); }
   };
 
-  // --- CLAIM BONUS (turnstile random jika kosong)
   document.getElementById('fb-claimBonus').onclick = async function() {
       if (!activeApiKey) return showStatus('Connect API Key first', "error");
       const code = document.getElementById('fb-bonusCodeInput').value.trim();
@@ -344,7 +524,6 @@
           if (json.data && json.data[dataKey]) {
               showStatus(`Claimed: ${json.data[dataKey].amount} ${json.data[dataKey].currency}`, "success");
               log("CLAIM " + code + " = " + JSON.stringify(json.data[dataKey]));
-              // Update USDT balance
               const user = json.data[dataKey].user;
               if (user && user.balances) {
                   let usdt = "-";
