@@ -23,7 +23,7 @@
   `;
   var html = `
     <div class="center">
-      <h2>FvckinBot™ Claimer</h2>
+      <h2>Sabot™ Claimer</h2>
       <div id="statusLine" class="mb-2">Status: <span id="statusText">Not connected</span></div>
       <div id="userInfo" class="mb-2">
         User ID: <span id="userId">-</span> | Credits: <span id="userCredits">-</span>
