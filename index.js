@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         saBot Claimer Modern UI Bootstrap (Rebuild)
+// @name         saBot Claimer Modern UI Bootstrap
 // @namespace    http://tampermonkey.net/
-// @version      3.1
-// @description  Modern multi-account Stake bonus claimer, Bootstrap 5 UI, modal login destroy after login, scrollable home
+// @version      3.0
+// @description  Modern multi-account Stake bonus claimer, Bootstrap 5 UI
 // @author       Gemini AI
 // @match        https://stake.com/*
 // @grant        GM_setValue
@@ -13,7 +13,6 @@
   const API_URL = "https://stake.com/_api/graphql";
   const AUTH_PASSWORD = "sagara321";
   const LS_ACCOUNTS = "sb_accs";
-
   // --- Inject Bootstrap 5.3 CDN if not exists
   function injectBootstrap() {
     if (!document.getElementById("bs-claimer-bootstrap")) {
@@ -126,15 +125,15 @@
   `;
   document.body.appendChild(root);
 
-  // --- Home: allow scrolling, destroy modal after login
+  // --- Always on top!
   root.style.position = "fixed";
   root.style.top = "0";
   root.style.left = "0";
   root.style.width = "100vw";
+  root.style.minHeight = "100vh";
   root.style.zIndex = "2147483647";
   root.style.background = "rgba(28,36,46,0.97)";
   root.style.pointerEvents = "auto";
-  root.style.overflow = "auto"; // allow scrolling after login!
 
   // --- STATE, LOGIC
   let accounts = [];
@@ -189,12 +188,9 @@
     const val = document.getElementById('fb-loginPassword').value.trim();
     if (!val) return document.getElementById('fb-loginErr').textContent = "Password required!";
     if (val !== AUTH_PASSWORD) return document.getElementById('fb-loginErr').textContent = "Wrong password!";
-    // DESTROY MODAL after login
-    const modal = document.getElementById('fb-claimer-modal');
-    if (modal) modal.parentNode.removeChild(modal);
+    document.getElementById('fb-claimer-modal').style.display = "none";
     document.getElementById('fb-claimer-panel-main').style.display = "";
     loadAccounts();
-    root.style.overflow = "auto"; // enable scroll
   };
   document.getElementById('fb-loginPassword').addEventListener('keydown', function(e) {
     if (e.key === "Enter") document.getElementById('fb-loginBtn').click();
