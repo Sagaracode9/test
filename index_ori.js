@@ -80,8 +80,8 @@
           </div>
           <div class="col-3 col-md-2">
             <select id="fb-couponType" class="form-select">
-              <option value="BONUS">BONUS</option>
-              <option value="CONDITION">COUPON</option>
+              <option value="bonus">BONUS</option>
+              <option value="coupon">COUPON</option>
             </select>
           </div>
           <div class="col-2 col-md-2">
@@ -103,8 +103,8 @@
           </div>
         </div>
         <div class="mb-2">
-          <label class="form-label">Turnstile Token (harus asli, bukan random!):</label>
-          <input type="text" class="form-control" id="fb-turnstileToken" placeholder="Token dari Cloudflare Turnstile">
+          <label class="form-label">Turnstile Token (auto random if empty):</label>
+          <input type="text" class="form-control" id="fb-turnstileToken" placeholder="DEMO-TOKEN or auto-random">
         </div>
         <div id="fb-status" class="alert py-2 px-3 mb-1 small" style="display:none;"></div>
         <div id="fb-log" class="border rounded small bg-dark-subtle p-2" style="min-height:60px;max-height:170px;overflow-y:auto;"></div>
@@ -164,6 +164,12 @@
         renderAccounts();
       };
     });
+  }
+  function randTurnstileToken() {
+    const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let token = "0.";
+    for(let i=0; i<190; i++) token += charset[Math.floor(Math.random()*charset.length)];
+    return token;
   }
 
   // --- Login Modal
@@ -259,8 +265,7 @@
     const code = document.getElementById('fb-checkBonusCode').value.trim();
     if (!code) return showStatus('Input code!', 'error');
     let couponType = document.getElementById('fb-couponType').value;
-    // --- Auto-konversi "COUPON" jadi "CONDITION" (karena yang diterima API hanya enum uppercase valid)
-    if (couponType === "COUPON") couponType = "CONDITION";
+    couponType = couponType.toLowerCase();
     const query = `query BonusCodeAvailability($code: String!, $couponType: CouponType!) {
       bonusCodeAvailability(code: $code, couponType: $couponType)
     }`;
@@ -289,8 +294,8 @@
     const type = document.getElementById('fb-claimType').value;
     let turnstileToken = document.getElementById('fb-turnstileToken').value.trim();
     if (!turnstileToken) {
-      showStatus('ERROR: Token turnstile tidak boleh kosong! Harus dari Cloudflare widget!', "error");
-      return;
+      turnstileToken = randTurnstileToken();
+      document.getElementById('fb-turnstileToken').value = turnstileToken;
     }
     // Query berbeda untuk mutation Condition & Normal (tidak error redeemed)
     const mutation =
@@ -346,11 +351,6 @@
       });
       const json = await res.json();
       const dataKey = type === "ClaimConditionBonusCode" ? "claimConditionBonusCode" : "claimBonusCode";
-      if (json.errors && json.errors.length && json.errors[0].message && json.errors[0].message.includes('invalidTurnstile')) {
-        showStatus('ERROR: Token turnstile invalid. Ambil token asli dari widget Cloudflare di browser, bukan random!', "error");
-        log("CLAIM ERR " + code + ": invalidTurnstile");
-        return;
-      }
       if (json.data && json.data[dataKey]) {
         showStatus(`Claimed: ${json.data[dataKey].amount} ${json.data[dataKey].currency}`, "success");
         log("CLAIM " + code + " = " + JSON.stringify(json.data[dataKey]));
