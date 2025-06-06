@@ -114,7 +114,7 @@
   document.body.appendChild(root);
 
   // --- STATE
-  let accountList = [{ name: "Budakcina" }, { name: "sabot" }];
+  let accountList = [{ name: "Demo Account" }, { name: "sabot" }];
   let apiKey = null;
 
   // --- RENDER ACCOUNTS
