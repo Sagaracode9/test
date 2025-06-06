@@ -50,7 +50,7 @@
       </div>
     </div>
     <div id="fb-claimer-header">
-      <span id="fb-claimer-title">FvckinBot Claimer</span>
+      <span id="fb-claimer-title">Sabot Claimer</span>
       <span id="fb-claimer-site">Site: stake.bet</span>
     </div>
     <div id="fb-claimer-main" style="display:none;">
@@ -91,8 +91,7 @@
 
   // 3. Data & Logic
   let accountList = [
-    { name: "Budakcina" },
-    { name: "FvckinGambler" }
+    { name: "Sabot" }
   ];
   let apiKey = null;
   let userSession = {
