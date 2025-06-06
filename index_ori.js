@@ -1,202 +1,321 @@
 (function(){
-  const API_URL = "/_api/graphql";
-  const LS_ACCOUNTS = "my_accounts_stake";
-  let accounts = [];
-  let activeApiKey = null;
-
-  // HTML inject (versi clean, gaya mirip asli)
-  const root = document.createElement('div');
-  root.id = "sb-v2-root";
-  root.style = 'position:fixed;top:0;left:0;z-index:2147483647;width:100vw;min-height:100vh;background:rgba(28,36,46,0.97);font-family:monospace;';
-  root.innerHTML = `
-    <div style="max-width:480px;margin:80px auto;padding:24px 22px 30px 22px;background:#17222d;border-radius:16px;box-shadow:0 0 30px #000a;">
-      <h3 style="font-weight:bold;color:#ffd600;margin-bottom:15px;">FvckinBot™ Claimer</h3>
-      <div>
-        <label>API Key (96 chars):</label>
-        <input type="password" id="apiKeyInput" maxlength="96" class="form-control" style="width:100%;" autocomplete="off">
-        <button id="connectAPI" style="margin:8px 0 16px 0;padding:5px 16px;">Connect</button>
-        <span id="apiStatus" style="margin-left:10px;color:#f44;font-weight:bold;"></span>
+  // ===== CSS dan HTML string =====
+  var style = `
+    <style>
+      body { background: #151d27; color: #eee; font-family: monospace; margin: 0; }
+      .hidden { display: none; }
+      .center { display: flex; flex-direction: column; align-items: center; margin-top: 2em; }
+      .popup { background: #222c38; padding: 2em; border-radius: 8px; box-shadow: 0 0 24px #0008; }
+      .log-table { width: 100%; margin-top: 2em; border-collapse: collapse; }
+      .log-table th, .log-table td { border: 1px solid #444; padding: 6px; text-align: left; }
+      .accounts-list { margin-top: 1em; }
+      .error { color: #f44; }
+      .success { color: #4f4; }
+      input, select { padding: 4px 8px; border-radius: 5px; border: 1px solid #888; margin-bottom: 8px; }
+      button { padding: 4px 12px; border-radius: 5px; border: none; background: #1475e1; color: #fff; cursor: pointer; }
+      button:disabled { opacity: 0.5; }
+      .mt-2 { margin-top: 1em; }
+      .mb-2 { margin-bottom: 1em; }
+      .flex-row { display: flex; align-items: center; gap: 8px; }
+      .account-entry { background: #1a2c38; margin-bottom: 6px; border-radius: 5px; padding: 6px 12px; display: flex; align-items: center; gap: 1em; }
+      .del-btn { background: #f44; color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; }
+    </style>
+  `;
+  var html = `
+    <div class="center">
+      <h2>FvckinBot™ Claimer</h2>
+      <div id="statusLine" class="mb-2">Status: <span id="statusText">Not connected</span></div>
+      <div id="userInfo" class="mb-2">
+        User ID: <span id="userId">-</span> | Credits: <span id="userCredits">-</span>
       </div>
-      <div style="margin:8px 0 18px 0;">
-        <div><b>Accounts:</b></div>
-        <div id="accountsList"></div>
+      <div id="licensePopup" class="popup">
+        <div style="font-weight:bold;">Enter Password</div>
+        <input type="password" id="licenseInput" style="width:320px" autocomplete="off">
+        <div id="licenseError" class="error mb-2"></div>
+        <button id="licenseBtn">Login</button>
       </div>
-      <div style="margin-bottom:12px;">
-        <input type="text" id="bonusCodeInput" class="form-control" placeholder="Enter Bonus Code" style="width:60%;display:inline-block;">
-        <select id="couponType" style="margin-left:8px;">
-          <option value="bonus">BONUS</option>
-          <option value="condition">COUPON</option>
-        </select>
-        <button id="btnCheckBonus" style="margin-left:6px;">Check</button>
-        <span id="checkBonusStatus" style="margin-left:10px;"></span>
+      <div id="mainContent" class="hidden">
+        <h4>Add Account (API Key)</h4>
+        <input type="text" id="apiKeyInput" placeholder="Paste 96-char API Key" style="width:320px">
+        <button id="connectAccBtn">Connect</button>
+        <span id="accountErrorMsg" class="error"></span>
+        <div class="accounts-list" id="accountsList"></div>
+        <h4 class="mt-2">Manual Claim</h4>
+        <div class="flex-row">
+          <input type="text" id="redeemCodeInput" placeholder="Enter claim code" style="width:200px">
+          <button id="dropClaimBtn">Drop</button>
+          <button id="bonusClaimBtn">Bonus</button>
+        </div>
+        <span id="redeemErrorMsg" class="error"></span>
+        <span id="redeemSuccessMsg" class="success"></span>
+        <h4 class="mt-2">History</h4>
+        <table class="log-table">
+          <thead>
+            <tr><th>Date</th><th>Action</th><th>Details</th></tr>
+          </thead>
+          <tbody id="historyList"></tbody>
+        </table>
+        <div id="logs" style="margin-top:2em;">
+          <h4>Log</h4>
+          <div id="logEntries"></div>
+        </div>
       </div>
-      <div style="margin-bottom:12px;">
-        <select id="claimCurrency" style="margin-right:8px;">
-          <option value="usdt">USDT</option>
-          <option value="btc">BTC</option>
-          <option value="eth">ETH</option>
-          <option value="bnb">BNB</option>
-          <option value="busd">BUSD</option>
-        </select>
-        <input type="text" id="turnstileToken" class="form-control" placeholder="Turnstile Token (Cloudflare)" style="width:56%;display:inline-block;">
-        <button id="btnClaim" style="margin-left:8px;">Claim</button>
-        <span id="claimStatus" style="margin-left:8px;"></span>
-      </div>
-      <div id="sbLog" style="font-size:13px;line-height:1.5;margin-top:18px;color:#aaa;height:84px;overflow:auto;border:1px solid #22313a;padding:7px 11px;background:#131a22;border-radius:7px;"></div>
-      <div style="margin-top:18px;color:#446;">by FvckinBot™</div>
     </div>
   `;
-  document.body.appendChild(root);
 
-  // Helper log/status
-  function log(s) {
-    const d = document.getElementById('sbLog');
-    d.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${s}</div>`;
-    d.scrollTop = d.scrollHeight;
+  document.open();
+  document.write(style + html);
+  document.close();
+
+  // ====== Logic JS after UI displayed ======
+  // --- State
+  let userData = { id: '-', credits: 0 };
+  let userAccounts = [];
+
+  const mainApiPath = '/_api/graphql';
+  const currencies = ['btc', 'eth', 'bnb', 'usdt', 'dai', 'busd', 'cro', 'ltc', 'bch', 'doge', 'uni', 'sand', 'ape', 'shib', 'usdc', 'trx', 'eos', 'xrp', 'pol', 'link'];
+  const claimTypes = { drop: [200, 100], bonus: [100, 50], reload: 20 };
+
+  // --- Helper selectors
+  const licensePopup = document.getElementById('licensePopup');
+  const licenseInput = document.getElementById('licenseInput');
+  const licenseBtn = document.getElementById('licenseBtn');
+  const licenseError = document.getElementById('licenseError');
+  const mainContent = document.getElementById('mainContent');
+  const statusLine = document.getElementById('statusLine');
+  const statusText = document.getElementById('statusText');
+  const userIdSpan = document.getElementById('userId');
+  const userCreditsSpan = document.getElementById('userCredits');
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const connectAccBtn = document.getElementById('connectAccBtn');
+  const accountsList = document.getElementById('accountsList');
+  const accountErrorMsg = document.getElementById('accountErrorMsg');
+  const redeemCodeInput = document.getElementById('redeemCodeInput');
+  const dropClaimBtn = document.getElementById('dropClaimBtn');
+  const bonusClaimBtn = document.getElementById('bonusClaimBtn');
+  const redeemErrorMsg = document.getElementById('redeemErrorMsg');
+  const redeemSuccessMsg = document.getElementById('redeemSuccessMsg');
+  const historyList = document.getElementById('historyList');
+  const logEntries = document.getElementById('logEntries');
+
+  // --- UI helpers
+  function setStatus(txt, connected) {
+    statusText.textContent = txt;
+    statusLine.style.color = connected ? "#4fc94f" : "#f44";
   }
-  function showStatus(id, msg, ok) {
-    const el = document.getElementById(id);
-    el.textContent = msg || '';
-    el.style.color = ok===false ? "#f44" : (ok===true ? "#3dbd5d" : "#ffd600");
+  function updateUserUI() {
+    userIdSpan.textContent = userData.id;
+    userCreditsSpan.textContent = userData.credits;
+  }
+  function showLicensePopup() {
+    licensePopup.classList.remove('hidden');
+    mainContent.classList.add('hidden');
+  }
+  function hideLicensePopup() {
+    licensePopup.classList.add('hidden');
+    mainContent.classList.remove('hidden');
+  }
+  function addLog(level, message) {
+    const entry = document.createElement('div');
+    entry.textContent = `[${new Date().toLocaleString()}] [${level.toUpperCase()}] ${message}`;
+    logEntries.appendChild(entry);
+    logEntries.scrollTop = logEntries.scrollHeight;
+  }
+  function addHistory(action, details) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${new Date().toLocaleString()}</td><td>${action}</td><td>${details}</td>`;
+    historyList.prepend(tr);
   }
   function renderAccounts() {
-    const list = document.getElementById('accountsList');
-    list.innerHTML = "";
-    accounts.forEach((acc, i) => {
-      const div = document.createElement('div');
-      div.style = "padding:3px 0;";
-      div.innerHTML = `<span style="color:#16f;font-weight:bold;">${acc.username||'-'}</span>
-      <button data-i="${i}" style="margin-left:8px;color:#fff;background:#d44;padding:0 8px 1px 8px;border:none;border-radius:3px;cursor:pointer;">X</button>`;
-      list.appendChild(div);
-    });
-    Array.from(list.querySelectorAll('button')).forEach(btn=>{
-      btn.onclick = () => { accounts.splice(+btn.dataset.i,1); saveAccounts(); renderAccounts(); };
+    accountsList.innerHTML = '';
+    userAccounts.forEach((acc, idx) => {
+      const el = document.createElement('div');
+      el.className = 'account-entry';
+      el.innerHTML = `
+        <b>${acc.username}</b> (${acc.currency.toUpperCase()})
+        <select data-idx="${idx}" class="currency-sel">${currencies.map(c=>`<option value="${c}" ${c===acc.currency?'selected':''}>${c.toUpperCase()}</option>`).join('')}</select>
+        <button class="del-btn" title="Delete Account" data-idx="${idx}">&times;</button>
+      `;
+      accountsList.appendChild(el);
     });
   }
-  function saveAccounts(){ localStorage.setItem(LS_ACCOUNTS, JSON.stringify(accounts)); }
-  function loadAccounts(){ try{ accounts = JSON.parse(localStorage.getItem(LS_ACCOUNTS)||"[]"); }catch{ accounts=[]; } renderAccounts(); }
 
-  // Connect API
-  document.getElementById('connectAPI').onclick = async function(){
-    const apiKey = document.getElementById('apiKeyInput').value.trim();
-    if (!apiKey || apiKey.length!==96) { showStatus('apiStatus',"Invalid Key!",false); return; }
-    showStatus('apiStatus',"Checking...",null);
+  // --- API logic
+  function getDomain() {
+    return window.location.hostname === 'localhost'
+      ? 'localhost'
+      : window.location.hostname;
+  }
+  async function graphqlFetch(apiKey, payload) {
+    const res = await fetch(`https://${getDomain()}${mainApiPath}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-access-token': apiKey },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`${res.statusText} (${res.status})`);
+    return res.json();
+  }
+  async function fetchUsername(apiKey) {
     try {
-      const q = `query UserMeta($name: String, $signupCode: Boolean = false) {
-        user(name: $name) {
-          id name isMuted isRainproof isBanned createdAt campaignSet
-        }
-      }`;
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: {"Content-Type":"application/json","x-access-token":apiKey},
-        body: JSON.stringify({query:q, variables:{name:null, signupCode:false}})
+      const data = await graphqlFetch(apiKey, {
+        variables: { signupCode: true },
+        query: `query UserMeta($name: String, $signupCode: Boolean = false) {
+          user(name: $name) { id name }
+        }`
       });
-      const json = await res.json();
-      if(json.data && json.data.user) {
-        let u = json.data.user;
-        showStatus('apiStatus',`Connected as ${u.name||u.id}`,true);
-        activeApiKey = apiKey;
-        if (!accounts.some(a=>a.apiKey===apiKey)) {
-          accounts.push({apiKey, username:u.name||u.id, currency:'usdt'});
-          saveAccounts();
-          renderAccounts();
-        }
-      } else {
-        showStatus('apiStatus',json.errors && json.errors.length ? json.errors[0].message : "API error",false);
-        activeApiKey = null;
-      }
-    } catch(e){
-      showStatus('apiStatus',"Conn Error",false);
-      activeApiKey = null;
-    }
-  };
-
-  // Check Bonus Code Availability
-  document.getElementById('btnCheckBonus').onclick = async function(){
-    if (!activeApiKey) return showStatus('checkBonusStatus',"Connect API first",false);
-    const code = document.getElementById('bonusCodeInput').value.trim();
-    let couponType = document.getElementById('couponType').value; // "bonus" / "condition"
-    if (!code) return showStatus('checkBonusStatus',"Input code",false);
-    showStatus('checkBonusStatus',"Checking...",null);
+      return data.data.user.name;
+    } catch { return null; }
+  }
+  async function claimBonusCode(account, code, claimType) {
     try {
-      const query = `query BonusCodeAvailability($code: String!, $couponType: CouponType!) {
-        bonusCodeAvailability(code: $code, couponType: $couponType)
-      }`;
-      const variables = { code, couponType };
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: {"Content-Type":"application/json","x-access-token":activeApiKey},
-        body: JSON.stringify({query, variables})
-      });
-      const json = await res.json();
-      if (json.data && typeof json.data.bonusCodeAvailability!=="undefined") {
-        showStatus('checkBonusStatus',json.data.bonusCodeAvailability?"AVAILABLE":"Not Available",json.data.bonusCodeAvailability);
-        log("Check: "+code+" = "+json.data.bonusCodeAvailability);
-      } else if (json.errors && json.errors.length){
-        showStatus('checkBonusStatus',json.errors[0].message,false);
-        log("Check ERR: "+json.errors[0].message);
+      let operationName = claimType === 'drop' ? 'ClaimDropCode' : 'ClaimBonusCode';
+      let query = claimType === 'drop'
+        ? `mutation ClaimDropCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) { claimDropCode(code: $code, currency: $currency, turnstileToken: $turnstileToken) { bonusCode { id code } amount currency user { id balances { available { amount currency } } } } }`
+        : `mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) { claimBonusCode(code: $code, currency: $currency, turnstileToken: $turnstileToken) { bonusCode { id code } amount currency user { id balances { available { amount currency } } } redeemed } }`;
+      const payload = {
+        operationName,
+        variables: {
+          currency: account.currency.toUpperCase(),
+          code,
+          turnstileToken: account.turnstileToken || ""
+        },
+        query
+      };
+      const data = await graphqlFetch(account.apiKey, payload);
+      if (data.data && data.data[operationName]) {
+        return `${data.data[operationName].amount.toFixed(8)} ${account.currency.toUpperCase()} Successfully claimed`;
+      } else if (data.errors) {
+        return data.errors[0].errorType;
       }
-    } catch (e) { showStatus('checkBonusStatus','Error',false); }
-  };
-
-  // Claim Bonus
-  document.getElementById('btnClaim').onclick = async function(){
-    if (!activeApiKey) return showStatus('claimStatus',"Connect API first",false);
-    const code = document.getElementById('bonusCodeInput').value.trim();
-    let couponType = document.getElementById('couponType').value; // "bonus" / "condition"
-    const currency = document.getElementById('claimCurrency').value;
-    const turnstileToken = document.getElementById('turnstileToken').value.trim();
-    if (!code) return showStatus('claimStatus',"Input code",false);
-    if (!turnstileToken) return showStatus('claimStatus',"Turnstile required",false);
-
-    let mutation, opName;
-    if(couponType==="condition"){
-      mutation = `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
-        claimConditionBonusCode(code: $code, currency: $currency, turnstileToken: $turnstileToken) {
-          bonusCode { id code __typename }
-          amount currency
-          user { id balances { available { amount currency __typename } vault { amount currency __typename } __typename } __typename }
-          __typename
-        }
-      }`; opName="claimConditionBonusCode";
-    }else{
-      mutation = `mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
-        claimBonusCode(code: $code, currency: $currency, turnstileToken: $turnstileToken) {
-          bonusCode { id code __typename }
-          amount currency
-          user { id balances { available { amount currency __typename } __typename } __typename }
-          redeemed __typename
-        }
-      }`; opName="claimBonusCode";
+      return 'unknownError';
+    } catch {
+      return 'unknownError';
     }
-    const variables = { code, currency, turnstileToken };
-    showStatus('claimStatus',"Claiming...",null);
-    try{
-      const res = await fetch(API_URL, {
-        method:"POST",
-        headers:{"Content-Type":"application/json","x-access-token":activeApiKey},
-        body: JSON.stringify({ query: mutation, variables })
-      });
-      const json = await res.json();
-      if (json.errors && json.errors.length && json.errors[0].message && json.errors[0].message.includes('invalidTurnstile')){
-        showStatus('claimStatus',"ERROR: Turnstile token invalid! Harus dari widget asli Cloudflare.",false);
-        log("Claim ERR: invalidTurnstile");
-        return;
-      }
-      if(json.data && json.data[opName]){
-        let amount = json.data[opName].amount, curr = json.data[opName].currency;
-        showStatus('claimStatus',`Claimed: ${amount} ${curr}`,true);
-        log(`CLAIM: ${code} (${curr}) = ${amount}`);
-      } else if (json.errors && json.errors.length){
-        showStatus('claimStatus',json.errors[0].message,false);
-        log("Claim ERR: "+json.errors[0].message);
-      } else {
-        showStatus('claimStatus',"Unknown error",false);
-      }
-    }catch(e){ showStatus('claimStatus','Error',false);}
-  };
+  }
 
-  // Initial
-  loadAccounts();
+  // --- Account logic
+  async function addAccount(apiKey) {
+    if (!apiKey || apiKey.length !== 96) {
+      accountErrorMsg.textContent = 'API Key must be exactly 96 characters.';
+      return;
+    }
+    if (userAccounts.length >= 5) {
+      accountErrorMsg.textContent = 'Maximum 5 accounts allowed.';
+      return;
+    }
+    const username = await fetchUsername(apiKey);
+    if (!username) {
+      accountErrorMsg.textContent = 'Invalid API Key or unable to fetch username.';
+      return;
+    }
+    accountErrorMsg.textContent = '';
+    userAccounts.push({
+      isLocal: true,
+      apiKey,
+      username,
+      currency: 'usdt'
+    });
+    renderAccounts();
+    addHistory('Connect Account', username);
+    apiKeyInput.value = '';
+  }
+  function removeAccount(idx) {
+    userAccounts.splice(idx, 1);
+    renderAccounts();
+  }
+
+  // --- Bulk claim
+  async function claimCodeForAllAccounts(code, claimType = 'drop', amountLimit) {
+    if (!code || userAccounts.length === 0 || userData.credits < 100) return;
+    redeemErrorMsg.textContent = '';
+    redeemSuccessMsg.textContent = '';
+    let errors = [];
+    let successes = [];
+    await Promise.all(userAccounts.map(async (acc, idx) => {
+      try {
+        const res = await claimBonusCode(acc, code, claimType);
+        if (res.includes('Successfully claimed')) {
+          successes.push(`${acc.username}: ${claimType.toUpperCase()} [${code}] ${res}`);
+          userData.credits -= claimTypes[claimType][1] || 50;
+        } else {
+          errors.push(`${acc.username}: ${claimType.toUpperCase()} [${code}] ${res}`);
+        }
+        addHistory(acc.username, `[${code}] ${res}`);
+        updateUserUI();
+      } catch (e) {
+        errors.push(`${acc.username}: ${claimType.toUpperCase()} [${code}] Error`);
+      }
+    }));
+    if (successes.length) {
+      redeemSuccessMsg.textContent = successes.join('\n');
+    }
+    if (errors.length) {
+      redeemErrorMsg.textContent = errors.join('\n');
+    }
+  }
+
+  // --- Event listeners
+  licenseBtn.addEventListener('click', () => {
+    const val = licenseInput.value.trim();
+    if (!val) {
+      licenseError.textContent = 'Please enter the password.';
+      return;
+    }
+    if (val !== 'Sagara321') {
+      licenseError.textContent = 'Incorrect password!';
+      return;
+    }
+    licenseError.textContent = '';
+    setStatus('Connected (local password)', true);
+    hideLicensePopup();
+  });
+  connectAccBtn.addEventListener('click', () => {
+    addAccount(apiKeyInput.value.trim());
+  });
+  accountsList.addEventListener('change', e => {
+    if (e.target.classList.contains('currency-sel')) {
+      const idx = +e.target.getAttribute('data-idx');
+      userAccounts[idx].currency = e.target.value;
+    }
+  });
+  accountsList.addEventListener('click', e => {
+    if (e.target.classList.contains('del-btn')) {
+      const idx = +e.target.getAttribute('data-idx');
+      removeAccount(idx);
+    }
+  });
+  dropClaimBtn.addEventListener('click', () => {
+    const code = redeemCodeInput.value.trim();
+    if (!code) {
+      redeemErrorMsg.textContent = 'Please enter a redeem code.';
+      return;
+    }
+    claimCodeForAllAccounts(code, 'drop');
+  });
+  bonusClaimBtn.addEventListener('click', () => {
+    const code = redeemCodeInput.value.trim();
+    if (!code) {
+      redeemErrorMsg.textContent = 'Please enter a redeem code.';
+      return;
+    }
+    claimCodeForAllAccounts(code, 'bonus');
+  });
+
+  // --- On load
+  window.addEventListener('DOMContentLoaded', () => {
+    renderAccounts();
+    updateUserUI();
+    showLicensePopup();
+    setStatus('Password Required', false);
+  });
+
+  // Fallback in case DOMContentLoaded already happened (paste di console)
+  if(document.readyState === "complete" || document.readyState === "interactive"){
+    renderAccounts();
+    updateUserUI();
+    showLicensePopup();
+    setStatus('Password Required', false);
+  }
+
 })();
