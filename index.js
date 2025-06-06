@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         saBot Claimer Bootstrap Modern
+// @name         saBot Claimer Modern UI Bootstrap
 // @namespace    http://tampermonkey.net/
-// @version      4.1
-// @description  Stake multi-account bonus claimer, full Bootstrap UI, logic untouched
-// @author       Gemini AI
+// @version      3.2
+// @description  Modern multi-account Stake bonus claimer, Bootstrap 5 UI
+// @author       Gemini AI & Sagara
 // @match        https://stake.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -13,32 +13,26 @@
   const API_URL = "https://stake.com/_api/graphql";
   const AUTH_PASSWORD = "sagara321";
   const LS_ACCOUNTS = "sb_accs";
-
-  // --- Inject Bootstrap 5.3 CDN
-  if (!document.getElementById("bs-claimer-bootstrap")) {
-    const link = document.createElement("link");
-    link.id = "bs-claimer-bootstrap";
-    link.rel = "stylesheet";
-    link.href = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css";
-    document.head.appendChild(link);
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js";
-    document.body.appendChild(script);
+  // --- Inject Bootstrap 5.3 CDN if not exists
+  function injectBootstrap() {
+    if (!document.getElementById("bs-claimer-bootstrap")) {
+      const link = document.createElement("link");
+      link.id = "bs-claimer-bootstrap";
+      link.rel = "stylesheet";
+      link.href = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css";
+      document.head.appendChild(link);
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js";
+      document.body.appendChild(script);
+    }
   }
+  injectBootstrap();
 
   // --- Main UI Root
   const root = document.createElement('div');
   root.id = "fb-claimer-root";
-  root.style.position = "fixed";
-  root.style.top = "0";
-  root.style.left = "0";
-  root.style.width = "100vw";
-  root.style.zIndex = "2147483647";
-  root.style.background = "rgba(28,36,46,0.97)";
-  root.style.pointerEvents = "auto";
-  root.style.overflow = "auto";
   root.innerHTML = `
-  <div id="fb-claimer-modal" class="modal fade show d-block" tabindex="-1" aria-modal="true" role="dialog" style="background:rgba(34,44,55,0.93);z-index:2147483647;">
+  <div class="modal fade show d-block" id="fb-claimer-modal" tabindex="-1" aria-modal="true" role="dialog" style="background:rgba(34,44,55,0.96);z-index:2147483647;">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content shadow border-0">
         <div class="modal-header bg-primary text-white">
@@ -54,9 +48,10 @@
       </div>
     </div>
   </div>
-  <div id="fb-claimer-main" class="container-fluid" style="display:none;max-width:700px;margin:60px auto 50px auto;">
-    <nav class="navbar navbar-expand navbar-dark bg-primary rounded-bottom mb-4 px-4 py-2 shadow">
+  <div id="fb-claimer-panel-main" class="container-fluid p-0" style="display:none;max-width:700px;margin:60px auto 50px auto;position:relative;pointer-events:auto;">
+    <nav class="navbar navbar-expand navbar-dark bg-primary rounded-bottom mb-4 px-4 py-2 shadow" style="z-index:999;">
       <span class="navbar-brand fw-bold">saBot Claimer</span>
+      <span class="ms-auto text-light small">Site: stake.bet</span>
     </nav>
     <div class="card shadow mb-4">
       <div class="card-header fw-semibold bg-gradient text-primary">User & Balance Info</div>
@@ -119,8 +114,11 @@
           </div>
         </div>
         <div class="mb-2">
-          <label class="form-label">Turnstile Token (auto random if empty):</label>
-          <input type="text" class="form-control" id="fb-turnstileToken" placeholder="DEMO-TOKEN or auto-random">
+            <label class="form-label">Turnstile Token (auto-detected from page):</label>
+            <div class="input-group">
+                <input type="text" class="form-control" id="fb-turnstileToken" placeholder="Click 'Get Token' to find it on the page" readonly>
+                <button class="btn btn-outline-secondary" id="fb-getTurnstileBtn" type="button">Get Token</button>
+            </div>
         </div>
         <div id="fb-status" class="alert py-2 px-3 mb-1 small" style="display:none;"></div>
         <div id="fb-log" class="border rounded small bg-dark-subtle p-2" style="min-height:60px;max-height:170px;overflow-y:auto;"></div>
@@ -130,7 +128,18 @@
   `;
   document.body.appendChild(root);
 
-  // --- STATE & LOGIC
+  // Styling
+  root.style.position = "fixed";
+  root.style.top = "0";
+  root.style.left = "0";
+  root.style.width = "100vw";
+  root.style.height = "100vh";
+  root.style.zIndex = "2147483647";
+  root.style.background = "rgba(28,36,46,0.97)";
+  root.style.pointerEvents = "auto";
+  root.style.overflowY = "auto";
+
+  // --- STATE, LOGIC
   let accounts = [];
   let activeApiKey = null;
   function loadAccounts() {
@@ -171,11 +180,24 @@
       };
     });
   }
-  function randTurnstileToken() {
-    const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    let token = "0.";
-    for(let i=0; i<190; i++) token += charset[Math.floor(Math.random()*charset.length)];
-    return token;
+  
+  // --- [DIHAPUS] ---
+  // Fungsi randTurnstileToken() dihapus karena sudah tidak berguna.
+
+  // --- [BARU] Fungsi untuk mencari token Turnstile asli dari halaman ---
+  function findAndSetTurnstileToken() {
+    const turnstileInput = document.querySelector('input[name="cf-turnstile-response"]');
+    const tokenDisplay = document.getElementById('fb-turnstileToken');
+    if (turnstileInput && turnstileInput.value) {
+        tokenDisplay.value = turnstileInput.value;
+        showStatus('Found Turnstile token!', 'success');
+        return turnstileInput.value;
+    } else {
+        tokenDisplay.value = '';
+        showStatus('Turnstile token not found on page. Try reloading the page or interacting with it first.', 'error');
+        log('ERROR: Could not find cf-turnstile-response input on the page.');
+        return null;
+    }
   }
 
   // --- Login Modal
@@ -183,16 +205,29 @@
     const val = document.getElementById('fb-loginPassword').value.trim();
     if (!val) return document.getElementById('fb-loginErr').textContent = "Password required!";
     if (val !== AUTH_PASSWORD) return document.getElementById('fb-loginErr').textContent = "Wrong password!";
-    document.getElementById('fb-claimer-modal').style.display = "none";
-    document.getElementById('fb-claimer-main').style.display = "";
+    
+    const modal = document.getElementById('fb-claimer-modal');
+    if (modal) {
+        modal.remove();
+    }
+    root.style.background = "transparent";
+    root.style.pointerEvents = "none";
+    document.getElementById('fb-claimer-panel-main').style.display = "";
     loadAccounts();
+    // [BARU] Otomatis cari token saat pertama kali login
+    setTimeout(findAndSetTurnstileToken, 500); 
   };
   document.getElementById('fb-loginPassword').addEventListener('keydown', function(e) {
     if (e.key === "Enter") document.getElementById('fb-loginBtn').click();
   });
 
+  // [BARU] Event listener untuk tombol 'Get Token'
+  document.getElementById('fb-getTurnstileBtn').onclick = findAndSetTurnstileToken;
+
+
   // --- Connect API
   document.getElementById('fb-connectAPI').onclick = async function() {
+    // ... (kode di bagian ini tidak berubah)
     const input = document.getElementById('fb-apiKeyInput').value.trim();
     if (!input) return showStatus('API Key required', "error");
     if (input.length !== 96) return showStatus('API Key must be 96 chars', "error");
@@ -326,40 +361,42 @@
     if (!activeApiKey) return showStatus('Connect API Key first', "error");
     const code = document.getElementById('fb-bonusCodeInput').value.trim();
     if (!code) return showStatus('Input bonus code', "error");
-    const type = document.getElementById('fb-claimType').value;
-    let turnstileToken = document.getElementById('fb-turnstileToken').value.trim();
+
+    // --- [DIUBAH] Mengambil token dari input field, yang diisi oleh fungsi findAndSetTurnstileToken ---
+    const turnstileToken = document.getElementById('fb-turnstileToken').value;
     if (!turnstileToken) {
-      turnstileToken = randTurnstileToken();
-      document.getElementById('fb-turnstileToken').value = turnstileToken;
+        return showStatus('Turnstile Token is required. Click "Get Token" to find it.', "error");
     }
+    
+    const type = document.getElementById('fb-claimType').value;
     const mutation =
       type === "ClaimConditionBonusCode"
       ? `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
           claimConditionBonusCode(
-             code: $code
-             currency: $currency
-             turnstileToken: $turnstileToken
+            code: $code
+            currency: $currency
+            turnstileToken: $turnstileToken
           ) {
-             bonusCode { id code }
-             amount
-             currency
-             user { id balances { available { amount currency } vault { amount currency } } }
-             redeemed
+            bonusCode { id code }
+            amount
+            currency
+            user { id balances { available { amount currency } vault { amount currency } } }
+            redeemed
           }
-      }`
+        }`
       : `mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
           claimBonusCode(
-             code: $code
-             currency: $currency
-             turnstileToken: $turnstileToken
+            code: $code
+            currency: $currency
+            turnstileToken: $turnstileToken
           ) {
-             bonusCode { id code }
-             amount
-             currency
-             user { id balances { available { amount currency } vault { amount currency } } }
-             redeemed
+            bonusCode { id code }
+            amount
+            currency
+            user { id balances { available { amount currency } vault { amount currency } } }
+            redeemed
           }
-      }`;
+        }`;
     const variables = { code, currency: "usdt", turnstileToken };
     try {
       const res = await fetch(API_URL, {
