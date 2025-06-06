@@ -1,827 +1,841 @@
 (function() {
 
-  // --- CSS inject
+   // --- CSS inject
 
-  const style = document.createElement('style');
+   const style = document.createElement('style');
 
-  style.textContent = `
+   style.textContent = `
 
-    #fb-claimer-root * { box-sizing:border-box; }
+     #fb-claimer-root * { box-sizing:border-box; }
 
-    #fb-claimer-root { all:unset; position:fixed; top:0; left:0; width:100vw; min-height:100vh; z-index:99999; background:#151c23; color:#fff; font-family: 'Fira Mono', monospace; }
+     #fb-claimer-root { all:unset; position:fixed; top:0; left:0; width:100vw; min-height:100vh; z-index:99999; background:#151c23; color:#fff; font-family: 'Fira Mono', monospace; }
 
-    #fb-claimer-modal { background:#223447e9; position:fixed; left:0;top:0;width:100vw;height:100vh; display:flex; align-items:center;justify-content:center; z-index:1000;}
+     #fb-claimer-modal { background:#223447e9; position:fixed; left:0;top:0;width:100vw;height:100vh; display:flex; align-items:center;justify-content:center; z-index:1000;}
 
-    #fb-claimer-modal .popup-inner { background:#253a50; padding:36px 28px; border-radius:13px; min-width:260px; max-width:95vw; box-shadow:0 6px 36px #000b;}
+     #fb-claimer-modal .popup-inner { background:#253a50; padding:36px 28px; border-radius:13px; min-width:260px; max-width:95vw; box-shadow:0 6px 36px #000b;}
 
-    #fb-claimer-header { background: #212f3d; padding: 18px 32px; font-size: 1.7em; border-radius: 0 0 14px 14px; display:flex; justify-content:space-between; align-items:center; }
+     #fb-claimer-header { background: #212f3d; padding: 18px 32px; font-size: 1.7em; border-radius: 0 0 14px 14px; display:flex; justify-content:space-between; align-items:center; }
 
-    #fb-claimer-title { font-weight: bold; }
+     #fb-claimer-title { font-weight: bold; }
 
-    #fb-claimer-site { font-size: 0.85em; color: #fff9; }
+     #fb-claimer-site { font-size: 0.85em; color: #fff9; }
 
-    #fb-claimer-main { max-width: 660px; margin: 36px auto 60px auto; }
+     #fb-claimer-main { max-width: 660px; margin: 36px auto 60px auto; }
 
-    .fb-claimer-panel { background: #223447; margin-top: 28px; border-radius: 12px; padding: 0 0 24px 0; box-shadow: 0 2px 16px #0009; }
+     .fb-claimer-panel { background: #223447; margin-top: 28px; border-radius: 12px; padding: 0 0 24px 0; box-shadow: 0 2px 16px #0009; }
 
-    .fb-claimer-panel .panel-title { background: #2488ff; color: #fff; font-weight: bold; border-radius: 12px 12px 0 0; padding: 11px 24px; font-size: 1.09em; letter-spacing:1px;}
+     .fb-claimer-panel .panel-title { background: #2488ff; color: #fff; font-weight: bold; border-radius: 12px 12px 0 0; padding: 11px 24px; font-size: 1.09em; letter-spacing:1px;}
 
-    .panel-content { padding: 20px 24px 0 24px; }
+     .panel-content { padding: 20px 24px 0 24px; }
 
-    .user-info { margin-bottom:10px; font-size:1.09em;}
+     .user-info { margin-bottom:10px; font-size:1.09em;}
 
-    .user-info div { margin-bottom:7px; }
+     .user-info div { margin-bottom:7px; }
 
-    .user-status-row { font-size:.97em; color:#ffd54f;}
+     .user-status-row { font-size:.97em; color:#ffd54f;}
 
-    .fb-viphost, .fb-faucet { font-size:.95em; color:#ffe7a4; margin-top:7px;}
+     .fb-viphost, .fb-faucet { font-size:.95em; color:#ffe7a4; margin-top:7px;}
 
-    .account-list { margin-bottom:12px; }
+     .account-list { margin-bottom:12px; }
 
-    .account-item { background: #2d4250; border-radius: 7px; padding: 9px 13px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; font-size:1em;}
+     .account-item { background: #2d4250; border-radius: 7px; padding: 9px 13px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; font-size:1em;}
 
-    .account-item .label { font-weight: 600;}
+     .account-item .label { font-weight: 600;}
 
-    .account-item .btns button { border:none; background:transparent; font-size:1.15em; cursor:pointer; margin-left:7px;}
+     .account-item .btns button { border:none; background:transparent; font-size:1.15em; cursor:pointer; margin-left:7px;}
 
-    .api-form { display: flex; gap: 8px; margin-top: 10px; }
+     .api-form { display: flex; gap: 8px; margin-top: 10px; }
 
-    .api-form input { flex:1; padding: 8px; border-radius:7px; border: none; background: #232f3a; color: #fff;}
+     .api-form input { flex:1; padding: 8px; border-radius:7px; border: none; background: #232f3a; color: #fff;}
 
-    .api-form button { border-radius: 7px; border: none; background: #2488ff; color: #fff; padding: 8px 14px; font-weight: bold; cursor:pointer;}
+     .api-form button { border-radius: 7px; border: none; background: #2488ff; color: #fff; padding: 8px 14px; font-weight: bold; cursor:pointer;}
 
-    .api-warning { color: #ffe892; font-size: 0.93em; margin-top: 7px;}
+     .api-warning { color: #ffe892; font-size: 0.93em; margin-top: 7px;}
 
-    .section-title { font-weight: bold; margin-top:24px; margin-bottom:12px; font-size:1.1em;}
+     .section-title { font-weight: bold; margin-top:24px; margin-bottom:12px; font-size:1.1em;}
 
-    .claim-form input, .checkcode-form input { padding:8px; border-radius:7px; border:none; background:#232f3a; color:#fff; margin-right:8px;}
+     .claim-form input, .checkcode-form input { padding:8px; border-radius:7px; border:none; background:#232f3a; color:#fff; margin-right:8px;}
 
-    .claim-form button, .checkcode-form button { border-radius: 7px; border: none; background: #2488ff; color: #fff; padding: 8px 18px; font-weight: bold; cursor:pointer;}
+     .claim-form button, .checkcode-form button { border-radius: 7px; border: none; background: #2488ff; color: #fff; padding: 8px 18px; font-weight: bold; cursor:pointer;}
 
-    .status { margin: 15px 0 0 0; font-size:1em; color:#fcf259; min-height:22px;}
+     .status { margin: 15px 0 0 0; font-size:1em; color:#fcf259; min-height:22px;}
 
-    .error { color:#ff6767;}
+     .error { color:#ff6767;}
 
-    .success { color:#baff84;}
+     .success { color:#baff84;}
 
-    .log-box { margin-top:13px; background:#162130; border-radius:7px; padding:8px 12px; font-size:.93em; min-height:36px;}
+     .log-box { margin-top:13px; background:#162130; border-radius:7px; padding:8px 12px; font-size:.93em; min-height:36px;}
 
-    @media (max-width:700px){
+     @media (max-width:700px){
 
-      #fb-claimer-main {max-width:99vw;}
+        #fb-claimer-main {max-width:99vw;}
 
-      .fb-claimer-panel {padding-left:0;padding-right:0;}
+        .fb-claimer-panel {padding-left:0;padding-right:0;}
 
-    }
+     }
 
-  `;
+   `;
 
-  document.head.appendChild(style);
+   document.head.appendChild(style);
 
 
 
-  // --- UI HTML root
+   // --- UI HTML root
 
-  const root = document.createElement('div');
+   const root = document.createElement('div');
 
-  root.id = "fb-claimer-root";
+   root.id = "fb-claimer-root";
 
-  root.innerHTML = `
+   root.innerHTML = `
 
-    <div id="fb-claimer-modal">
+     <div id="fb-claimer-modal">
 
-      <div class="popup-inner">
+        <div class="popup-inner">
 
-        <h3 style="margin:0 0 14px 0; color:#FCF259;">Enter Password</h3>
+          <h3 style="margin:0 0 14px 0; color:#FCF259;">Enter Password</h3>
 
-        <input type="password" id="fb-loginPassword" maxlength="100" style="width:100%; margin-bottom:15px;" placeholder="Enter Password">
+          <input type="password" id="fb-loginPassword" maxlength="100" style="width:100%; margin-bottom:15px;" placeholder="Enter Password">
 
-        <button id="fb-loginBtn" style="width:100%;margin-bottom:10px;">Login</button>
+          <button id="fb-loginBtn" style="width:100%;margin-bottom:10px;">Login</button>
 
-        <div id="fb-loginErr" style="color:#ff6767; min-height:20px;"></div>
+          <div id="fb-loginErr" style="color:#ff6767; min-height:20px;"></div>
 
-      </div>
+        </div>
 
-    </div>
+     </div>
 
-    <div id="fb-claimer-header">
+     <div id="fb-claimer-header">
 
-      <span id="fb-claimer-title">saBot Claimer</span>
+        <span id="fb-claimer-title">saBot Claimer</span>
 
-      <span id="fb-claimer-site">Site: stake.bet</span>
+        <span id="fb-claimer-site">Site: stake.bet</span>
 
-    </div>
+     </div>
 
-    <div id="fb-claimer-main" style="display:none;">
+     <div id="fb-claimer-main" style="display:none;">
 
-      <div class="fb-claimer-panel">
+        <div class="fb-claimer-panel">
 
-        <div class="panel-title">USER & BALANCE INFO</div>
+          <div class="panel-title">USER & BALANCE INFO</div>
 
-        <div class="panel-content user-info">
+          <div class="panel-content user-info">
 
-           <div>User Id: <span id="fb-userId">-</span></div>
+             <div>User Id: <span id="fb-userId">-</span></div>
 
-           <div>User Name: <span id="fb-userName">-</span></div>
+             <div>User Name: <span id="fb-userName">-</span></div>
 
-           <div class="user-status-row" id="fb-userStatus"></div>
+             <div class="user-status-row" id="fb-userStatus"></div>
 
-           <div>Credits (USDT): <span id="fb-userCredits">-</span></div>
+             <div>Credits (USDT): <span id="fb-userCredits">-</span></div>
 
-           <div class="fb-viphost" id="fb-viphost"></div>
+             <div class="fb-viphost" id="fb-viphost"></div>
 
-           <div class="fb-faucet" id="fb-faucet"></div>
+             <div class="fb-faucet" id="fb-faucet"></div>
 
-        </div>
+          </div>
 
-      </div>
+        </div>
 
-      <div class="fb-claimer-panel">
+        <div class="fb-claimer-panel">
 
-        <div class="panel-title">CONNECTS ACCOUNTS</div>
+          <div class="panel-title">CONNECTS ACCOUNTS</div>
 
-        <div class="panel-content">
+          <div class="panel-content">
 
-           <div id="fb-accounts" class="account-list"></div>
+             <div id="fb-accounts" class="account-list"></div>
 
-           <div class="api-form">
+             <div class="api-form">
 
-             <input type="password" id="fb-apiKeyInput" maxlength="100" placeholder="Enter API Key (96 characters)">
+               <input type="password" id="fb-apiKeyInput" maxlength="100" placeholder="Enter API Key (96 characters)">
 
-             <button id="fb-pasteClipboard" title="Paste from clipboard">📋</button>
+               <button id="fb-pasteClipboard" title="Paste from clipboard">📋</button>
 
-             <button id="fb-connectAPI">Connect</button>
+               <button id="fb-connectAPI">Connect</button>
 
-           </div>
+             </div>
 
-           <div class="api-warning">
+             <div class="api-warning">
 
-             Please be aware that maintaining multiple accounts may pose risks.
+               Please be aware that maintaining multiple accounts may pose risks.
 
-           </div>
+             </div>
 
-        </div>
+          </div>
 
-      </div>
+        </div>
 
-      <div class="fb-claimer-panel">
+        <div class="fb-claimer-panel">
 
-        <div class="panel-title">BONUS & CLAIM</div>
+          <div class="panel-title">BONUS & CLAIM</div>
 
-        <div class="panel-content">
+          <div class="panel-content">
 
-           <div class="checkcode-form" style="margin-bottom:12px;">
+             <div class="checkcode-form" style="margin-bottom:12px;">
 
-             <input type="text" id="fb-checkBonusCode" maxlength="50" placeholder="Check Bonus Code Availability">
+               <input type="text" id="fb-checkBonusCode" maxlength="50" placeholder="Check Bonus Code Availability">
 
-             <select id="fb-couponType" style="padding:8px;border-radius:7px;background:#232f3a;color:#fff;">
+               <select id="fb-couponType" style="padding:8px;border-radius:7px;background:#232f3a;color:#fff;">
 
-                <option value="bonus">BONUS</option>
+                  <option value="BONUS">BONUS</option>
 
-                <option value="coupon">COUPON</option>
+                  <option value="COUPON">COUPON</option>
 
-             </select>
+               </select>
 
-             <button id="fb-btnCheckBonus">Check</button>
+               <button id="fb-btnCheckBonus">Check</button>
 
-           </div>
+             </div>
 
-           <div class="claim-form" style="margin-top:8px;">
+             <div class="claim-form" style="margin-top:8px;">
 
-             <input type="text" id="fb-bonusCodeInput" maxlength="50" placeholder="Enter Bonus Code">
+               <input type="text" id="fb-bonusCodeInput" maxlength="50" placeholder="Enter Bonus Code">
 
-             <select id="fb-claimType" style="padding:8px;border-radius:7px;background:#232f3a;color:#fff;">
+               <select id="fb-claimType" style="padding:8px;border-radius:7px;background:#232f3a;color:#fff;">
 
-                <option value="ClaimBonusCode">Normal</option>
+                  <option value="ClaimBonusCode">Normal</option>
 
-                <option value="ClaimConditionBonusCode">Condition</option>
+                  <option value="ClaimConditionBonusCode">Condition</option>
 
-             </select>
+               </select>
 
-             <button id="fb-claimBonus">Claim Bonus</button>
+               <button id="fb-claimBonus">Claim Bonus</button>
 
-           </div>
+             </div>
 
-           <div style="margin-top:8px;">
+             <div style="margin-top:8px;">
 
-             <label>Turnstile Token:
+               <label>Turnstile Token:
 
-                <input type="text" id="fb-turnstileToken" style="width:60%;padding:5px;border-radius:7px;background:#232f3a;color:#fff;" placeholder="DEMO-TOKEN or real">
+                  <input type="text" id="fb-turnstileToken" style="width:60%;padding:5px;border-radius:7px;background:#232f3a;color:#fff;" placeholder="DEMO-TOKEN or real">
 
-             </label>
+               </label>
 
-           </div>
+             </div>
 
-           <div class="status" id="fb-status"></div>
+             <div class="status" id="fb-status"></div>
 
-           <div class="log-box" id="fb-log"></div>
+             <div class="log-box" id="fb-log"></div>
 
-        </div>
+          </div>
 
-      </div>
+        </div>
 
-    </div>
+     </div>
 
-  `;
+   `;
 
-  document.body.appendChild(root);
+   document.body.appendChild(root);
 
 
 
-  // --- STATE
+   // --- STATE
 
-  let accountList = [{ name: "Demo account" }, { name: "sabot" }];
+   let accountList = [{ name: "Demo akun" }, { name: "sabot" }];
 
-  let apiKey = null;
+   let apiKey = null;
 
 
 
-  // --- RENDER ACCOUNTS
+   // --- RENDER ACCOUNTS
 
-  function renderAccounts() {
+   function renderAccounts(){
 
-    const wrap = document.getElementById('fb-accounts');
+     const wrap = document.getElementById('fb-accounts');
 
-    wrap.innerHTML = "";
+     wrap.innerHTML = "";
 
-    accountList.forEach((acc, idx) => {
+     accountList.forEach((acc,idx)=>{
 
-      const div = document.createElement('div');
+        const div = document.createElement('div');
 
-      div.className = "account-item";
+        div.className = "account-item";
 
-      div.innerHTML = `
+        div.innerHTML = `
 
-        <span class="label">${acc.name}</span>
+          <span class="label">${acc.name}</span>
 
-        <span class="btns">
+          <span class="btns">
 
-           <button title="Settings" data-idx="${idx}" class="fb-set">⚙️</button>
+             <button title="Settings" data-idx="${idx}" class="fb-set">⚙️</button>
 
-           <button title="Delete" data-idx="${idx}" class="fb-del">🗑️</button>
+             <button title="Delete" data-idx="${idx}" class="fb-del">🗑️</button>
 
-        </span>
+          </span>
 
-      `;
+        `;
 
-      wrap.appendChild(div);
+        wrap.appendChild(div);
 
-    });
+     });
 
-    wrap.querySelectorAll('.fb-del').forEach(btn => {
+     wrap.querySelectorAll('.fb-del').forEach(btn=>{
 
-      btn.onclick = function() {
+        btn.onclick = function(){
 
-        accountList.splice(Number(btn.dataset.idx), 1);
+          accountList.splice(Number(btn.dataset.idx),1);
 
-        renderAccounts();
+          renderAccounts();
 
-      };
+        };
 
-    });
+     });
 
-    wrap.querySelectorAll('.fb-set').forEach(btn => {
+     wrap.querySelectorAll('.fb-set').forEach(btn=>{
 
-      btn.onclick = function() {
+        btn.onclick = function(){
 
-        alert('Setting for ' + accountList[Number(btn.dataset.idx)].name);
+          alert('Setting for '+accountList[Number(btn.dataset.idx)].name);
 
-      };
+        };
 
-    });
+     });
 
-  }
+   }
 
-  function showStatus(msg, type = null) {
+   function showStatus(msg, type=null){
 
-    const s = document.getElementById('fb-status');
+     const s = document.getElementById('fb-status');
 
-    s.textContent = msg;
+     s.textContent = msg;
 
-    s.className = "status" + (type ? (" " + type) : "");
+     s.className = "status" + (type ? (" "+type) : "");
 
-  }
+   }
 
-  function log(msg) {
+   function log(msg) {
 
-    const logDiv = document.getElementById('fb-log');
+     const logDiv = document.getElementById('fb-log');
 
-    logDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${msg}</div>`;
+     logDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${msg}</div>`;
 
-    logDiv.scrollTop = logDiv.scrollHeight;
+     logDiv.scrollTop = logDiv.scrollHeight;
 
-  }
+   }
 
 
 
-  // --- LOGIN
+   // --- LOGIN
 
-  document.getElementById('fb-loginBtn').onclick = function() {
+   document.getElementById('fb-loginBtn').onclick = function(){
 
-    const val = document.getElementById('fb-loginPassword').value.trim();
+     const val = document.getElementById('fb-loginPassword').value.trim();
 
-    if (!val) {
+     if(!val){
 
-      document.getElementById('fb-loginErr').textContent = "Password required!";
+        document.getElementById('fb-loginErr').textContent = "Password required!";
 
-      return;
+        return;
 
-    }
+     }
 
-    if (val !== "sagara321") {
+     if(val !== "sagara321"){
 
-      document.getElementById('fb-loginErr').textContent = "Wrong password!";
+        document.getElementById('fb-loginErr').textContent = "Wrong password!";
 
-      return;
+        return;
 
-    }
+     }
 
-    document.getElementById('fb-claimer-modal').style.display = "none";
+     document.getElementById('fb-claimer-modal').style.display = "none";
 
-    document.getElementById('fb-claimer-main').style.display = "";
+     document.getElementById('fb-claimer-main').style.display = "";
 
-    renderAccounts();
+     renderAccounts();
 
-  };
+   };
 
-  document.getElementById('fb-loginPassword').addEventListener('keydown', function(e) {
+   document.getElementById('fb-loginPassword').addEventListener('keydown',function(e){
 
-    if (e.key === "Enter") document.getElementById('fb-loginBtn').click();
+     if(e.key==="Enter") document.getElementById('fb-loginBtn').click();
 
-  });
+   });
 
 
 
-  // --- CONNECT API
+   // --- CONNECT API
 
-  document.getElementById('fb-connectAPI').onclick = async function() {
+   document.getElementById('fb-connectAPI').onclick = async function(){
 
-    const input = document.getElementById('fb-apiKeyInput').value.trim();
+     const input = document.getElementById('fb-apiKeyInput').value.trim();
 
-    if (!input) return showStatus('API Key required', "error");
+     if(!input) return showStatus('API Key required', "error");
 
-    if (input.length !== 96) return showStatus('API Key must be 96 chars', "error");
+     if(input.length !== 96) return showStatus('API Key must be 96 chars', "error");
 
-    apiKey = input;
+     apiKey = input;
 
-    showStatus('Connecting to API...');
+     showStatus('Connecting to API...');
 
-    // 1. UserMeta
 
-    let userId = "-", userName = "-", userStatus = "";
 
-    try {
+     // 1. UserMeta
 
-      const query = `
+     let userId = "-", userName = "-", userStatus = "";
 
-      query UserMeta($name: String, $signupCode: Boolean = false) {
+     try {
 
-        user(name: $name) {
+        const query = `
 
-           id
+        query UserMeta($name: String, $signupCode: Boolean = false) {
 
-           name
+          user(name: $name) {
 
-           isMuted
+             id
 
-           isRainproof
+             name
 
-           isBanned
+             isMuted
 
-           createdAt
+             isRainproof
 
-           campaignSet
+             isBanned
 
-           selfExclude { id status active createdAt expireAt }
+             createdAt
 
-           signupCode @include(if: $signupCode) { id code { id code } }
+             campaignSet
 
-        }
+             selfExclude { id status active createdAt expireAt }
 
-      }`;
+             signupCode @include(if: $signupCode) { id code { id code } }
 
-      const res = await fetch("https://stake.com/_api/graphql", {
+          }
 
-        method: "POST",
+        }`;
 
-        headers: { "Content-Type": "application/json", "x-access-token": apiKey },
+        const res = await fetch("https://stake.com/_api/graphql", {
 
-        body: JSON.stringify({ query, variables: { name: null, signupCode: false } })
+          method: "POST",
 
-      });
+          headers: { "Content-Type": "application/json", "x-access-token": apiKey },
 
-      const json = await res.json();
+          body: JSON.stringify({ query, variables: { name:null, signupCode:false } })
 
-      if (json.data && json.data.user) {
+        });
 
-        const u = json.data.user;
+        const json = await res.json();
 
-        userId = u.id || "-";
+        if(json.data && json.data.user) {
 
-        userName = u.name || "-";
+          const u = json.data.user;
 
-        userStatus = [
+          userId = u.id || "-";
 
-           u.isBanned ? "BANNED" : null,
+          userName = u.name || "-";
 
-           u.isMuted ? "MUTED" : null,
+          userStatus = [
 
-           u.isRainproof ? "RAINPROOF" : null,
+             u.isBanned ? "BANNED" : null,
 
-           u.campaignSet ? "CAMPAIGN" : null,
+             u.isMuted ? "MUTED" : null,
 
-           (u.selfExclude && u.selfExclude.active) ? "SELF-EXCLUDED" : null
+             u.isRainproof ? "RAINPROOF" : null,
 
-        ].filter(Boolean).join(", ");
+             u.campaignSet ? "CAMPAIGN" : null,
 
-      }
+             (u.selfExclude && u.selfExclude.active) ? "SELF-EXCLUDED" : null
 
-    } catch (e) {
+          ].filter(Boolean).join(", ");
 
-      log("UserMeta error: " + e.message);
+        }
 
-    }
+     } catch(e) {
 
-    // 2. UserBalances
+        log("UserMeta error: "+e.message);
 
-    let usdt = "-";
+     }
 
-    try {
 
-      const query = `
 
-      query UserBalances {
+     // 2. UserBalances
 
-        user {
+     let usdt = "-";
 
-           id
+     try {
 
-           balances {
+        const query = `
 
-             available { amount currency }
+        query UserBalances {
 
-             vault { amount currency }
+          user {
 
-           }
+             id
 
-        }
+             balances {
 
-      }`;
+               available { amount currency }
 
-      const res = await fetch("https://stake.com/_api/graphql", {
+               vault { amount currency }
 
-        method: "POST",
+             }
 
-        headers: { "Content-Type": "application/json", "x-access-token": apiKey },
+          }
 
-        body: JSON.stringify({ query })
+        }`;
 
-      });
+        const res = await fetch("https://stake.com/_api/graphql", {
 
-      const json = await res.json();
+          method: "POST",
 
-      if (json.data && json.data.user && json.data.user.balances) {
+          headers: { "Content-Type": "application/json", "x-access-token": apiKey },
 
-        for (const bal of json.data.user.balances) {
+          body: JSON.stringify({ query })
 
-           if (bal.available && bal.available.currency === "usdt") {
+        });
 
-             usdt = bal.available.amount;
+        const json = await res.json();
 
-             break;
+        if(json.data && json.data.user && json.data.user.balances) {
 
-           }
+          for(const bal of json.data.user.balances) {
 
-        }
+             if(bal.available && bal.available.currency === "usdt") {
 
-      }
+               usdt = bal.available.amount;
 
-    } catch (e) {
+               break;
 
-      log("UserBalances error: " + e.message);
+             }
 
-    }
+          }
 
-    // 3. VIP / Faucet (TANPA variables)
+        }
 
-    let viphost = "-", faucet = "-";
+     } catch(e) {
 
-    try {
+        log("UserBalances error: "+e.message);
 
-      const query = `
+     }
 
-      query VipMeta {
 
-        user {
 
-           vipInfo {
+     // 3. VIP / Faucet
 
-             host { name contactHandle contactLink email availableDays }
+     let viphost = "-", faucet = "-";
 
-           }
+     try {
 
-           reload: faucet { value active }
+        const query = `
 
-        }
+        query VipMeta($dailyBonusEnabled: Boolean!, $topUpEnabled: Boolean!) {
 
-      }`;
+          user {
 
-      const res = await fetch("https://stake.com/_api/graphql", {
+             vipInfo {
 
-        method: "POST",
+               host { name contactHandle contactLink email availableDays }
 
-        headers: { "Content-Type": "application/json", "x-access-token": apiKey },
+             }
 
-        body: JSON.stringify({ query })
+             reload: faucet { value active }
 
-      });
+          }
 
-      const json = await res.json();
+        }`;
 
-      if (json.data && json.data.user) {
+        const res = await fetch("https://stake.com/_api/graphql", {
 
-        if (json.data.user.vipInfo && json.data.user.vipInfo.host) {
+          method: "POST",
 
-           const h = json.data.user.vipInfo.host;
+          headers: { "Content-Type": "application/json", "x-access-token": apiKey },
 
-           viphost = (h.name ? h.name : "-") +
+          body: JSON.stringify({
 
-             (h.contactHandle ? " (" + h.contactHandle + ")" : "") +
+             query,
 
-             (h.contactLink ? " [" + h.contactLink + "]" : "");
+             variables: { dailyBonusEnabled:false, topUpEnabled:false }
 
-        }
+          })
 
-        if (json.data.user.reload) {
+        });
 
-           const f = json.data.user.reload;
+        const json = await res.json();
 
-           faucet = (f.active ? "Active" : "Inactive") + ", Value: " + f.value;
+        if(json.data && json.data.user) {
 
-        }
+          if(json.data.user.vipInfo && json.data.user.vipInfo.host) {
 
-      }
+             const h = json.data.user.vipInfo.host;
 
-    } catch (e) { log("VipMeta error: " + e.message); }
+             viphost = (h.name ? h.name : "-") +
 
-    // Update UI
+               (h.contactHandle ? " ("+h.contactHandle+")" : "") +
 
-    document.getElementById('fb-userId').textContent = userId;
+               (h.contactLink ? " ["+h.contactLink+"]" : "");
 
-    document.getElementById('fb-userName').textContent = userName;
+          }
 
-    document.getElementById('fb-userStatus').textContent = userStatus;
+          if(json.data.user.reload) {
 
-    document.getElementById('fb-userCredits').textContent = usdt;
+             const f = json.data.user.reload;
 
-    document.getElementById('fb-viphost').textContent = "VIP Host: " + viphost;
+             faucet = (f.active ? "Active" : "Inactive") + ", Value: " + f.value;
 
-    document.getElementById('fb-faucet').textContent = "Faucet: " + faucet;
+          }
 
-    showStatus('API Connected!', "success");
+        }
 
-    log("Connected as " + userName);
+     } catch(e) { log("VipMeta error: "+e.message); }
 
-    document.getElementById('fb-apiKeyInput').value = '';
 
-  };
 
+     // Update UI
 
+     document.getElementById('fb-userId').textContent = userId;
 
-  // Paste clipboard
+     document.getElementById('fb-userName').textContent = userName;
 
-  document.getElementById('fb-pasteClipboard').onclick = async function() {
+     document.getElementById('fb-userStatus').textContent = userStatus;
 
-    try {
+     document.getElementById('fb-userCredits').textContent = usdt;
 
-      const text = await navigator.clipboard.readText();
+     document.getElementById('fb-viphost').textContent = "VIP Host: " + viphost;
 
-      document.getElementById('fb-apiKeyInput').value = text || '';
+     document.getElementById('fb-faucet').textContent = "Faucet: " + faucet;
 
-    } catch {
 
-      showStatus('Clipboard not accessible', "error");
 
-    }
+     showStatus('API Connected!', "success");
 
-  };
+     log("Connected as "+userName);
 
+     document.getElementById('fb-apiKeyInput').value = '';
 
+   };
 
-  // --- CHECK BONUS CODE AVAILABILITY
 
-  document.getElementById('fb-btnCheckBonus').onclick = async function() {
 
-    if (!apiKey) return showStatus('Connect API Key first', 'error');
+   // Paste clipboard
 
-    const code = document.getElementById('fb-checkBonusCode').value.trim();
+   document.getElementById('fb-pasteClipboard').onclick = async function(){
 
-    if (!code) return showStatus('Input code!', 'error');
+     try{
 
-    let couponType = document.getElementById('fb-couponType').value;
+        const text = await navigator.clipboard.readText();
 
-    couponType = couponType.toLowerCase(); // FIX: CouponType must be lowercase
+        document.getElementById('fb-apiKeyInput').value = text || '';
 
-    const query = `query BonusCodeAvailability($code: String!, $couponType: CouponType!) {
+     }catch{
 
-      bonusCodeAvailability(code: $code, couponType: $couponType)
+        showStatus('Clipboard not accessible', "error");
 
-    }`;
+     }
 
-    const variables = { code, couponType };
+   };
 
-    try {
 
-      const res = await fetch("https://stake.com/_api/graphql", {
 
-        method: "POST",
+   // --- CHECK BONUS CODE AVAILABILITY
 
-        headers: { "Content-Type": "application/json", "x-access-token": apiKey },
+   document.getElementById('fb-btnCheckBonus').onclick = async function() {
 
-        body: JSON.stringify({ query, variables })
+     if(!apiKey) return showStatus('Connect API Key first', 'error');
 
-      });
+     const code = document.getElementById('fb-checkBonusCode').value.trim();
 
-      const json = await res.json();
+     if(!code) return showStatus('Input code!', 'error');
 
-      if (json.data && typeof json.data.bonusCodeAvailability !== "undefined") {
+     const couponType = document.getElementById('fb-couponType').value;
 
-        showStatus("Availability: " + (json.data.bonusCodeAvailability ? "Available" : "Not Available"), json.data.bonusCodeAvailability ? "success" : "error");
+     const query = `query BonusCodeAvailability($code: String!, $couponType: CouponType!) {
 
-        log("CheckCode: " + code + " = " + json.data.bonusCodeAvailability);
+        bonusCodeAvailability(code: $code, couponType: $couponType)
 
-      } else if (json.errors && json.errors.length) {
+     }`;
 
-        showStatus(json.errors[0].message, "error");
+     const variables = { code, couponType };
 
-        log("CheckCode Error: " + json.errors[0].message);
+     try {
 
-      }
+        const res = await fetch("https://stake.com/_api/graphql", {
 
-    } catch (e) {
+          method: "POST",
 
-      showStatus('Error checking code', "error");
+          headers: { "Content-Type": "application/json", "x-access-token": apiKey },
 
-    }
+          body: JSON.stringify({ query, variables })
 
-  };
+        });
 
+        const json = await res.json();
 
+        if(json.data && typeof json.data.bonusCodeAvailability !== "undefined") {
 
-  // --- CLAIM BONUS (pilih normal / condition)
+          showStatus("Availability: " + (json.data.bonusCodeAvailability ? "Available" : "Not Available"), json.data.bonusCodeAvailability ? "success" : "error");
 
-  document.getElementById('fb-claimBonus').onclick = async function() {
+          log("CheckCode: "+code+" = "+json.data.bonusCodeAvailability);
 
-    if (!apiKey) return showStatus('Connect API Key first', "error");
+        } else if(json.errors && json.errors.length) {
 
-    const code = document.getElementById('fb-bonusCodeInput').value.trim();
+          showStatus(json.errors[0].message, "error");
 
-    if (!code) return showStatus('Input bonus code', "error");
+          log("CheckCode Error: "+json.errors[0].message);
 
-    const type = document.getElementById('fb-claimType').value;
+        }
 
-    const turnstileToken = document.getElementById('fb-turnstileToken').value.trim() || "DEMO-TOKEN";
+     } catch(e) {
 
-    const mutation =
+        showStatus('Error checking code', "error");
 
-      type === "ClaimConditionBonusCode"
+     }
 
-      ? `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
+   };
 
-        claimConditionBonusCode(
 
-           code: $code
 
-           currency: $currency
+   // --- CLAIM BONUS (pilih normal / condition)
 
-           turnstileToken: $turnstileToken
+   document.getElementById('fb-claimBonus').onclick = async function(){
 
-        ) {
+     if(!apiKey) return showStatus('Connect API Key first', "error");
 
-           bonusCode { id code }
+     const code = document.getElementById('fb-bonusCodeInput').value.trim();
 
-           amount
+     if(!code) return showStatus('Input bonus code', "error");
 
-           currency
+     const type = document.getElementById('fb-claimType').value;
 
-           user {
+     const turnstileToken = document.getElementById('fb-turnstileToken').value.trim() || "DEMO-TOKEN";
 
-             id
+     const mutation =
 
-             balances { available { amount currency } }
+        type === "ClaimConditionBonusCode"
 
-           }
+        ? `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
 
-           redeemed
+          claimConditionBonusCode(
 
-        }
+             code: $code
 
-      }`
+             currency: $currency
 
-      : `mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
+             turnstileToken: $turnstileToken
 
-        claimBonusCode(
+          ) {
 
-           code: $code
+             bonusCode { id code }
 
-           currency: $currency
+             amount
 
-           turnstileToken: $turnstileToken
+             currency
 
-        ) {
+             user {
 
-           bonusCode { id code }
+               id
 
-           amount
+               balances { available { amount currency } }
 
-           currency
+             }
 
-           user {
+             redeemed
 
-             id
+          }
 
-             balances { available { amount currency } }
+        }`
 
-           }
+        : `mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
 
-           redeemed
+          claimBonusCode(
 
-        }
+             code: $code
 
-      }`;
+             currency: $currency
 
-    const variables = { code, currency: "usdt", turnstileToken }; // FIX: usdt lowercase
+             turnstileToken: $turnstileToken
 
-    try {
+          ) {
 
-      const res = await fetch("https://stake.com/_api/graphql", {
+             bonusCode { id code }
 
-        method: "POST",
+             amount
 
-        headers: { "Content-Type": "application/json", "x-access-token": apiKey },
+             currency
 
-        body: JSON.stringify({ query: mutation, variables })
+             user {
 
-      });
+               id
 
-      const json = await res.json();
+               balances { available { amount currency } }
 
-      const dataKey = type === "ClaimConditionBonusCode" ? "claimConditionBonusCode" : "claimBonusCode";
+             }
 
-      if (json.data && json.data[dataKey]) {
+             redeemed
 
-        showStatus(`Claimed: ${json.data[dataKey].amount} ${json.data[dataKey].currency}`, "success");
+          }
 
-        log("CLAIM " + code + " = " + JSON.stringify(json.data[dataKey]));
+        }`;
 
-        // Update USDT balance
+     const variables = { code, currency: "USDT", turnstileToken };
 
-        const user = json.data[dataKey].user;
+     try {
 
-        if (user && user.balances) {
+        const res = await fetch("https://stake.com/_api/graphql", {
 
-          let usdt = "-";
+          method: "POST",
 
-          for (const b of user.balances) {
+          headers: { "Content-Type": "application/json", "x-access-token": apiKey },
 
-            if (b.available && b.available.currency === "usdt") {
+          body: JSON.stringify({ query: mutation, variables })
 
-              usdt = b.available.amount;
+        });
 
-              break;
+        const json = await res.json();
 
-            }
+        const dataKey = type === "ClaimConditionBonusCode" ? "claimConditionBonusCode" : "claimBonusCode";
 
-          }
+        if(json.data && json.data[dataKey]){
 
-          document.getElementById('fb-userCredits').textContent = usdt;
+          showStatus(`Claimed: ${json.data[dataKey].amount} ${json.data[dataKey].currency}`, "success");
 
-        }
+          log("CLAIM "+code+" = "+JSON.stringify(json.data[dataKey]));
 
-      } else if (json.errors && json.errors.length) {
+          // Update USDT balance
 
-        showStatus(json.errors[0].message, "error");
+          const user = json.data[dataKey].user;
 
-        log("CLAIM ERR " + code + ": " + json.errors[0].message);
+          if(user && user.balances) {
 
-      } else {
+             let usdt = "-";
 
-        showStatus('Unknown error on bonus claim', "error");
+             for(const b of user.balances) {
 
-      }
+               if(b.available && b.available.currency === "usdt") {
 
-    } catch (e) {
+                  usdt = b.available.amount;
 
-      showStatus('Error on bonus claim', "error");
+                  break;
 
-    }
+               }
 
-  };
+             }
 
-  document.getElementById('fb-bonusCodeInput').addEventListener('keydown', function(e) {
+             document.getElementById('fb-userCredits').textContent = usdt;
 
-    if (e.key === "Enter") document.getElementById('fb-claimBonus').click();
+          }
 
-  });
+        }else if(json.errors && json.errors.length){
+
+          showStatus(json.errors[0].message, "error");
+
+          log("CLAIM ERR "+code+": "+json.errors[0].message);
+
+        }else{
+
+          showStatus('Unknown error on bonus claim', "error");
+
+        }
+
+     }catch(e){
+
+        showStatus('Error on bonus claim', "error");
+
+     }
+
+   };
+
+   document.getElementById('fb-bonusCodeInput').addEventListener('keydown',function(e){
+
+     if(e.key==="Enter") document.getElementById('fb-claimBonus').click();
+
+   });
 
 })();
