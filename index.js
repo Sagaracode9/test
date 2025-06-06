@@ -56,17 +56,13 @@ document.body.innerHTML += `
   </div>
   <div id="licensePopup" class="popup">
     <div class="popup-inner">
-      <h3 style="margin:0 0 14px 0; color:#FCF259;">Enter License Key</h3>
+      <h3 style="margin:0 0 14px 0; color:#FCF259;">Enter Password</h3>
       <input type="password" id="licenseInput" maxlength="100" style="width:100%; margin-bottom:15px;">
       <button id="loginLicense">Login</button>
       <div id="licenseErr" style="color:#ff6767;margin-top:10px;"></div>
     </div>
   </div>
 `;
-
-// 3. Logic sama persis
-const WSS_URL = "wss://b113f308-530d-4b65-964f-24d57e2cbe10-00-2j0vqotdaqayc.sisko.replit.dev:3000";
-const GQL_URL = "https://stake.com/_api/graphql";
 
 // Helper masking
 function mask(str, show=4) {
@@ -87,61 +83,26 @@ function logAction(action, details) {
   tr.innerHTML = `<td>${time}</td><td>${action}</td><td>${details}</td>`;
   t.appendChild(tr);
 }
-// LICENSE via WEBSOCKET
-let licenseKey = null;
-let ws = null;
-let wsUser = {};
+
+// AUTH PASSWORD SEDERHANA (GANTI WEBSOCKET)
 function loginLicense() {
   const input = document.getElementById('licenseInput').value.trim();
   if (!input) {
-    document.getElementById('licenseErr').textContent = "License required!";
+    document.getElementById('licenseErr').textContent = "Password required!";
     return;
   }
-  document.getElementById('licenseErr').textContent = "";
-  licenseKey = input;
-  ws = new WebSocket(WSS_URL);
-  ws.onopen = function() {
-    ws.send(JSON.stringify({ type: "license", license: licenseKey }));
-    showStatus('License sent, waiting...');
-  };
-  ws.onerror = function() {
-    showStatus('WebSocket connection error', "error");
-    document.getElementById('licenseErr').textContent = "Could not connect to license server.";
-  };
-  ws.onclose = function() {
-    showStatus('WebSocket disconnected', "error");
-    document.getElementById('licenseErr').textContent = "WebSocket closed.";
-  };
-  ws.onmessage = function(event) {
-    try {
-      const data = JSON.parse(event.data);
-      if (data.type === 'authenticated') {
-        wsUser = {
-          id: data.id,
-          username: data.username || "User",
-          credits: data.credits
-        };
-        updateUserPanel(wsUser);
-        document.getElementById('licensePopup').style.display = "none";
-        document.getElementById('userPanel').classList.remove('hidden');
-        document.getElementById('apiSection').classList.remove('hidden');
-        showStatus('License authenticated!', "success");
-        logAction('License', 'Authenticated');
-      } else if (data.type === 'refresh') {
-        wsUser.credits = data.credits;
-        updateUserPanel(wsUser);
-        showStatus('Credits updated!', "success");
-        logAction('Credits', 'Updated');
-      } else if (data.type === 'error') {
-        showStatus('License error: '+(data.reason||''), "error");
-        document.getElementById('licenseErr').textContent = data.reason || 'Error!';
-      }
-    } catch(e) {
-      showStatus('Error parsing server message', "error");
-    }
-  };
+  if (input !== "sagara321") {
+    document.getElementById('licenseErr').textContent = "Wrong password!";
+    return;
+  }
+  document.getElementById('licensePopup').style.display = "none";
+  document.getElementById('userPanel').classList.remove('hidden');
+  document.getElementById('apiSection').classList.remove('hidden');
+  showStatus('Login success!', "success");
+  logAction('Login', 'Password accepted');
   document.getElementById('licenseInput').value = '';
 }
+
 // Update user info panel
 function updateUserPanel(data) {
   document.getElementById('username').textContent = mask(data.username);
@@ -177,7 +138,7 @@ async function fetchUserMeta(apiKey) {
     }
   `;
   try {
-    const res = await fetch(GQL_URL, {
+    const res = await fetch("https://stake.com/_api/graphql", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -223,7 +184,7 @@ async function claimBonus() {
     turnstileToken: "DEMO-TOKEN"
   };
   try {
-    const res = await fetch(GQL_URL, {
+    const res = await fetch("https://stake.com/_api/graphql", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
