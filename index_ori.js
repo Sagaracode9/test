@@ -1,10 +1,8 @@
 (function() {
-  // Konstanta
+  // --- Konstanta dan Bootstrap inject ---
   const API_URL = "https://stake.com/_api/graphql";
   const AUTH_PASSWORD = "sagara321";
   const LS_ACCOUNTS = "sb_accs";
-
-  // --- Inject Bootstrap 5.3 CDN jika belum ada
   function injectBootstrap() {
     if (!document.getElementById("bs-claimer-bootstrap")) {
       const link = document.createElement("link");
@@ -19,7 +17,7 @@
   }
   injectBootstrap();
 
-  // --- UI Root
+  // --- UI Root ---
   const root = document.createElement('div');
   root.id = "fb-claimer-root";
   root.innerHTML = `
@@ -233,7 +231,7 @@
     }
     let usdt = "-";
     try {
-      const query = `query UserBalances { user { id balances { available { amount currency } vault { amount currency } } } }`;
+      const query = `query UserBalances { user { id balances { available { amount currency __typename } vault { amount currency __typename } __typename } __typename } }`;
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-access-token": activeApiKey },
@@ -299,32 +297,49 @@
       turnstileToken = randTurnstileToken();
       document.getElementById('fb-turnstileToken').value = turnstileToken;
     }
+    // Query berbeda untuk mutation Condition & Normal (tidak error redeemed)
     const mutation =
       type === "ClaimConditionBonusCode"
       ? `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
           claimConditionBonusCode(
-             code: $code
-             currency: $currency
-             turnstileToken: $turnstileToken
+            code: $code
+            currency: $currency
+            turnstileToken: $turnstileToken
           ) {
-             bonusCode { id code }
-             amount
-             currency
-             user { id balances { available { amount currency } vault { amount currency } } }
-             redeemed
+            bonusCode { id code __typename }
+            amount
+            currency
+            user {
+              id
+              balances {
+                available { amount currency __typename }
+                vault { amount currency __typename }
+                __typename
+              }
+              __typename
+            }
+            __typename
           }
       }`
       : `mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
           claimBonusCode(
-             code: $code
-             currency: $currency
-             turnstileToken: $turnstileToken
+            code: $code
+            currency: $currency
+            turnstileToken: $turnstileToken
           ) {
-             bonusCode { id code }
-             amount
-             currency
-             user { id balances { available { amount currency } vault { amount currency } } }
-             redeemed
+            bonusCode { id code __typename }
+            amount
+            currency
+            user {
+              id
+              balances {
+                available { amount currency __typename }
+                __typename
+              }
+              __typename
+            }
+            redeemed
+            __typename
           }
       }`;
     const variables = { code, currency: "usdt", turnstileToken };
