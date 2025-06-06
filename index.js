@@ -1,4 +1,4 @@
-// == FvckinBot Claimer UI - FULL JS CLONING ==
+// == sagara Claimer UI - FULL JS==
 (function(){
   // --- Tambah CSS ---
   const style = document.createElement('style');
