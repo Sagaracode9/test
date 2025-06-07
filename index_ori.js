@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         saBot Claimer Modern UI + Turnstile (Gabung Check & Claim - Bonus/Drop Enum)
+// @name         saBot Claimer Modern UI + Turnstile (Check & Claim - bonus/drop enum lowercase)
 // @namespace    http://tampermonkey.net/
-// @version      4.3
-// @description  Multi-account Stake bonus/drop claimer + Cloudflare Turnstile captcha widget - 1 Form (CouponType enum fix)
+// @version      4.4
+// @description  Multi-account Stake bonus/drop claimer + Cloudflare Turnstile captcha widget - 1 Form (enum lowercase)
 // @author       Gemini AI + ChatGPT
 // @match        https://stake.com/*
 // @grant        none
@@ -109,8 +109,8 @@
           </div>
           <div class="col-3 col-md-3">
             <select id="fb-couponType" class="form-select">
-              <option value="BONUS">BONUS</option>
-              <option value="DROP">DROP</option>
+              <option value="bonus">BONUS</option>
+              <option value="drop">DROP</option>
             </select>
           </div>
           <div class="col-2 col-md-2">
@@ -323,12 +323,12 @@
     } catch { showStatus('Clipboard not accessible', "error"); }
   };
 
-  // --- Gabungan 1 tombol: Check & Claim (enum CouponType fix)
+  // --- Gabungan 1 tombol: Check & Claim (enum lowercase)
   document.getElementById('fb-btnCheckClaim').onclick = async function() {
     if (!activeApiKey) return showStatus('Connect API Key first', "error");
     const code = document.getElementById('fb-codeInput').value.trim();
     if (!code) return showStatus('Input bonus/drop code!', "error");
-    const couponType = document.getElementById('fb-couponType').value; // langsung enum, tidak perlu lowercase
+    const couponType = document.getElementById('fb-couponType').value; // enum "bonus"/"drop"
     const type = document.getElementById('fb-claimType').value;
     const currency = document.getElementById('fb-claimCurrency').value;
     let turnstileToken = document.getElementById('fb-turnstileToken').value.trim();
