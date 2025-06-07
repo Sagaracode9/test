@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         saBot Claimer Modern UI + Turnstile (1-Form Check & Claim)
+// @name         saBot Claimer Modern UI + Turnstile (Stable One Form)
 // @namespace    http://tampermonkey.net/
-// @version      4.1
-// @description  Multi-account Stake bonus claimer + Cloudflare Turnstile captcha widget. All-in-1: Check & Claim in 1 button
-// @author       Gemini AI
+// @version      4.2
+// @description  Multi-account Stake bonus claimer + Cloudflare Turnstile captcha widget. Satu form: Check & Claim!
+// @author       Gemini AI & OpenAI
 // @match        https://stake.com/*
 // @grant        none
 // ==/UserScript==
@@ -208,7 +208,7 @@
   }
   renderCurrencyDropdown();
 
-  // --- Turnstile widget logic
+  // --- Turnstile widget logic: Robust auto-render, retry jika belum loaded
   let turnstileWidgetId = null;
   function renderTurnstile() {
     if (window.turnstile && document.getElementById('fb-turnstile-widget')) {
@@ -224,10 +224,24 @@
       });
     }
   }
-  setTimeout(() => { if (window.turnstile) renderTurnstile(); }, 1500);
-  window.onload = function() {
-    setTimeout(() => { if (window.turnstile) renderTurnstile(); }, 1000);
-  };
+  function waitTurnstileAndRenderWidget() {
+    let attempt = 0;
+    function tryRender() {
+      attempt++;
+      if (window.turnstile && typeof window.turnstile.render === "function") {
+        renderTurnstile();
+      } else if (attempt < 15) {
+        setTimeout(tryRender, 400);
+      } else {
+        showStatus('Captcha widget gagal load. Coba reload halaman.', 'error');
+      }
+    }
+    tryRender();
+  }
+  // panggil robust render
+  setTimeout(waitTurnstileAndRenderWidget, 1200);
+  window.onload = function() { setTimeout(waitTurnstileAndRenderWidget, 1000); };
+
   function resetTurnstile() {
     if (window.turnstile && turnstileWidgetId !== null) {
       window.turnstile.reset(turnstileWidgetId);
@@ -243,7 +257,7 @@
     document.getElementById('fb-claimer-modal').style.display = "none";
     document.getElementById('fb-claimer-panel-main').style.display = "";
     loadAccounts();
-    setTimeout(renderTurnstile, 600); // widget
+    setTimeout(waitTurnstileAndRenderWidget, 600); // widget
   };
   document.getElementById('fb-loginPassword').addEventListener('keydown', function(e) {
     if (e.key === "Enter") document.getElementById('fb-loginBtn').click();
@@ -429,5 +443,5 @@
   });
 
   // --- Rerender Turnstile widget on script load
-  setTimeout(renderTurnstile, 2000);
+  setTimeout(waitTurnstileAndRenderWidget, 2000);
 })();
