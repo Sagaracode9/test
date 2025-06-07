@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         saBot Claimer Modern UI + Turnstile (Gabung Check & Claim)
+// @name         saBot Claimer Modern UI + Turnstile (Gabung Check & Claim - Bonus/Drop)
 // @namespace    http://tampermonkey.net/
-// @version      4.1
-// @description  Multi-account Stake bonus claimer + Cloudflare Turnstile captcha widget - 1 Form
+// @version      4.2
+// @description  Multi-account Stake bonus claimer + Cloudflare Turnstile captcha widget - 1 Form Bonus/Drop
 // @author       Gemini AI + ChatGPT
 // @match        https://stake.com/*
 // @grant        none
@@ -101,16 +101,16 @@
       </div>
     </div>
     <div class="card shadow mb-4">
-      <div class="card-header fw-semibold bg-gradient text-primary">Bonus/Coupon Check & Claim</div>
+      <div class="card-header fw-semibold bg-gradient text-primary">Bonus/Drop Check & Claim</div>
       <div class="card-body">
         <div class="row g-2 align-items-center mb-3">
           <div class="col-5 col-md-5">
-            <input type="text" class="form-control" id="fb-codeInput" maxlength="50" placeholder="Enter Bonus/Coupon Code">
+            <input type="text" class="form-control" id="fb-codeInput" maxlength="50" placeholder="Enter Bonus/Drop Code">
           </div>
           <div class="col-3 col-md-3">
             <select id="fb-couponType" class="form-select">
               <option value="bonus">BONUS</option>
-              <option value="coupon">COUPON</option>
+              <option value="coupon">DROP</option>
             </select>
           </div>
           <div class="col-2 col-md-2">
@@ -327,8 +327,11 @@
   document.getElementById('fb-btnCheckClaim').onclick = async function() {
     if (!activeApiKey) return showStatus('Connect API Key first', "error");
     const code = document.getElementById('fb-codeInput').value.trim();
-    if (!code) return showStatus('Input bonus/coupon code!', "error");
-    const couponType = document.getElementById('fb-couponType').value.toLowerCase();
+    if (!code) return showStatus('Input bonus/drop code!', "error");
+    let couponType = document.getElementById('fb-couponType').value;
+    // Ubah value DROP menjadi 'coupon' agar sesuai API backend!
+    if (couponType === "DROP") couponType = "coupon";
+    couponType = couponType.toLowerCase();
     const type = document.getElementById('fb-claimType').value;
     const currency = document.getElementById('fb-claimCurrency').value;
     let turnstileToken = document.getElementById('fb-turnstileToken').value.trim();
@@ -355,7 +358,7 @@
         if (json.data.bonusCodeAvailability) {
           log("Code AVAILABLE. Claiming...");
           // 2. Kalau available, lanjut claim!
-          showStatus("Code available. Claiming bonus...");
+          showStatus("Code available. Claiming bonus/drop...");
           const mutation =
             type === "ClaimConditionBonusCode"
             ? `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
