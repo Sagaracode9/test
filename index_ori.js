@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         saBot Claimer Modern UI + Turnstile (Stable One Form)
+// @name         saBot Claimer Modern UI + Turnstile (Gabung Check & Claim)
 // @namespace    http://tampermonkey.net/
-// @version      4.2
-// @description  Multi-account Stake bonus claimer + Cloudflare Turnstile captcha widget. Satu form: Check & Claim!
-// @author       Gemini AI & OpenAI
+// @version      4.1
+// @description  Multi-account Stake bonus claimer + Cloudflare Turnstile captcha widget - 1 Form
+// @author       Gemini AI + ChatGPT
 // @match        https://stake.com/*
 // @grant        none
 // ==/UserScript==
@@ -101,7 +101,7 @@
       </div>
     </div>
     <div class="card shadow mb-4">
-      <div class="card-header fw-semibold bg-gradient text-primary">Bonus: Check & Claim (All-in-1)</div>
+      <div class="card-header fw-semibold bg-gradient text-primary">Bonus/Coupon Check & Claim</div>
       <div class="card-body">
         <div class="row g-2 align-items-center mb-3">
           <div class="col-5 col-md-5">
@@ -208,7 +208,7 @@
   }
   renderCurrencyDropdown();
 
-  // --- Turnstile widget logic: Robust auto-render, retry jika belum loaded
+  // --- Turnstile widget logic
   let turnstileWidgetId = null;
   function renderTurnstile() {
     if (window.turnstile && document.getElementById('fb-turnstile-widget')) {
@@ -224,24 +224,10 @@
       });
     }
   }
-  function waitTurnstileAndRenderWidget() {
-    let attempt = 0;
-    function tryRender() {
-      attempt++;
-      if (window.turnstile && typeof window.turnstile.render === "function") {
-        renderTurnstile();
-      } else if (attempt < 15) {
-        setTimeout(tryRender, 400);
-      } else {
-        showStatus('Captcha widget gagal load. Coba reload halaman.', 'error');
-      }
-    }
-    tryRender();
-  }
-  // panggil robust render
-  setTimeout(waitTurnstileAndRenderWidget, 1200);
-  window.onload = function() { setTimeout(waitTurnstileAndRenderWidget, 1000); };
-
+  setTimeout(() => { if (window.turnstile) renderTurnstile(); }, 1500);
+  window.onload = function() {
+    setTimeout(() => { if (window.turnstile) renderTurnstile(); }, 1000);
+  };
   function resetTurnstile() {
     if (window.turnstile && turnstileWidgetId !== null) {
       window.turnstile.reset(turnstileWidgetId);
@@ -257,7 +243,7 @@
     document.getElementById('fb-claimer-modal').style.display = "none";
     document.getElementById('fb-claimer-panel-main').style.display = "";
     loadAccounts();
-    setTimeout(waitTurnstileAndRenderWidget, 600); // widget
+    setTimeout(renderTurnstile, 600);
   };
   document.getElementById('fb-loginPassword').addEventListener('keydown', function(e) {
     if (e.key === "Enter") document.getElementById('fb-loginBtn').click();
@@ -337,7 +323,7 @@
     } catch { showStatus('Clipboard not accessible', "error"); }
   };
 
-  // --- Gabungan: Check & Claim Bonus (1 Form, 1 Button)
+  // --- Gabungan 1 tombol: Check & Claim
   document.getElementById('fb-btnCheckClaim').onclick = async function() {
     if (!activeApiKey) return showStatus('Connect API Key first', "error");
     const code = document.getElementById('fb-codeInput').value.trim();
@@ -409,7 +395,7 @@
           if (claimJson.data && claimJson.data[dataKey]) {
             showStatus(`Claimed: ${claimJson.data[dataKey].amount} ${claimJson.data[dataKey].currency}`, "success");
             log("CLAIM " + code + " = " + JSON.stringify(claimJson.data[dataKey]));
-            // Update balance display
+            // Update balance
             const user = claimJson.data[dataKey].user;
             if (user && user.balances) {
               let bal = "-";
@@ -443,5 +429,5 @@
   });
 
   // --- Rerender Turnstile widget on script load
-  setTimeout(waitTurnstileAndRenderWidget, 2000);
+  setTimeout(renderTurnstile, 2000);
 })();
