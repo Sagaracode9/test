@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         saBot Claimer Modern UI + Turnstile (Check & Claim - bonus/drop enum lowercase)
+// @name         saBot Claimer Modern UI + Turnstile (bonus/drop enum + Turnstile Stable)
 // @namespace    http://tampermonkey.net/
-// @version      4.4
-// @description  Multi-account Stake bonus/drop claimer + Cloudflare Turnstile captcha widget - 1 Form (enum lowercase)
+// @version      4.5
+// @description  Stake bonus/drop claimer + Cloudflare Turnstile stable widget + 1 form
 // @author       Gemini AI + ChatGPT
 // @match        https://stake.com/*
 // @grant        none
@@ -34,7 +34,11 @@
   injectBootstrap();
 
   // --- Inject Cloudflare Turnstile JS jika belum ada
-  function injectTurnstile() {
+  function injectTurnstileScript(callback) {
+    if (window.turnstile) {
+      callback();
+      return;
+    }
     if (!document.getElementById("cf-turnstile-js")) {
       const sc = document.createElement("script");
       sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
@@ -43,9 +47,15 @@
       sc.id = "cf-turnstile-js";
       document.head.appendChild(sc);
     }
+    // Poll until window.turnstile available
+    const wait = setInterval(function() {
+      if (window.turnstile && typeof window.turnstile.render === "function") {
+        clearInterval(wait);
+        callback();
+      }
+    }, 200);
   }
-  injectTurnstile();
-
+  
   // --- UI Root
   const root = document.createElement('div');
   root.id = "fb-claimer-root";
@@ -156,6 +166,7 @@
   // --- STATE, LOGIC
   let accounts = [];
   let activeApiKey = null;
+
   function loadAccounts() {
     try { accounts = JSON.parse(localStorage.getItem(LS_ACCOUNTS) || "[]"); } catch { accounts = []; }
     renderAccounts();
@@ -210,30 +221,35 @@
 
   // --- Turnstile widget logic
   let turnstileWidgetId = null;
-  function renderTurnstile() {
-    if (window.turnstile && document.getElementById('fb-turnstile-widget')) {
-      document.getElementById('fb-turnstile-widget').innerHTML = "";
-      turnstileWidgetId = window.turnstile.render('#fb-turnstile-widget', {
-        sitekey: T_SITEKEY,
-        callback: function(token) {
-          document.getElementById('fb-turnstileToken').value = token;
-        },
-        "error-callback": function() {
-          document.getElementById('fb-turnstileToken').value = "";
-        }
-      });
-    }
+  function renderTurnstileWidget() {
+    const container = document.getElementById('fb-turnstile-widget');
+    const input = document.getElementById('fb-turnstileToken');
+    if (!window.turnstile || !container) return;
+    container.innerHTML = "";
+    input.value = "";
+    turnstileWidgetId = window.turnstile.render(container, {
+      sitekey: T_SITEKEY,
+      callback: function(token) {
+        input.value = token;
+      },
+      "error-callback": function() {
+        input.value = "";
+      }
+    });
   }
-  setTimeout(() => { if (window.turnstile) renderTurnstile(); }, 1500);
-  window.onload = function() {
-    setTimeout(() => { if (window.turnstile) renderTurnstile(); }, 1000);
-  };
   function resetTurnstile() {
+    const input = document.getElementById('fb-turnstileToken');
     if (window.turnstile && turnstileWidgetId !== null) {
       window.turnstile.reset(turnstileWidgetId);
-      document.getElementById('fb-turnstileToken').value = "";
+      input.value = "";
     }
   }
+  // Turnstile stable: render ONLY after script loaded, rerender if needed
+  function ensureTurnstileRendered() {
+    injectTurnstileScript(renderTurnstileWidget);
+  }
+  // Trigger first render
+  setTimeout(ensureTurnstileRendered, 1000);
 
   // --- Modal Login
   document.getElementById('fb-loginBtn').onclick = function() {
@@ -243,7 +259,7 @@
     document.getElementById('fb-claimer-modal').style.display = "none";
     document.getElementById('fb-claimer-panel-main').style.display = "";
     loadAccounts();
-    setTimeout(renderTurnstile, 600);
+    setTimeout(ensureTurnstileRendered, 600);
   };
   document.getElementById('fb-loginPassword').addEventListener('keydown', function(e) {
     if (e.key === "Enter") document.getElementById('fb-loginBtn').click();
@@ -338,7 +354,6 @@
       return;
     }
 
-    // 1. Cek ketersediaan code dulu
     showStatus("Checking code availability...");
     try {
       const checkQuery = `query BonusCodeAvailability($code: String!, $couponType: CouponType!) {
@@ -354,7 +369,6 @@
       if (json.data && typeof json.data.bonusCodeAvailability !== "undefined") {
         if (json.data.bonusCodeAvailability) {
           log("Code AVAILABLE. Claiming...");
-          // 2. Kalau available, lanjut claim!
           showStatus("Code available. Claiming bonus/drop...");
           const mutation =
             type === "ClaimConditionBonusCode"
@@ -428,6 +442,7 @@
     if (e.key === "Enter") document.getElementById('fb-btnCheckClaim').click();
   });
 
-  // --- Rerender Turnstile widget on script load
-  setTimeout(renderTurnstile, 2000);
+  // --- Jaga Turnstile agar tidak blank pada reload halaman, login, dsb
+  setTimeout(ensureTurnstileRendered, 2000);
+
 })();
