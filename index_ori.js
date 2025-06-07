@@ -1,21 +1,24 @@
 // ==UserScript==
-// @name         saBot Claimer Modern UI + Turnstile (Bypass Otomatis)
+// @name         saBot Claimer Modern UI + Turnstile
 // @namespace    http://tampermonkey.net/
-// @version      4.1
-// @description  Modern Stake Bonus Claimer: jika captcha kosong auto generate random, widget selalu muncul!
-// @author       GeminiAI & OpenAI
+// @version      4.0
+// @description  Multi-account Stake bonus claimer + Cloudflare Turnstile captcha widget
+// @author       Gemini AI
 // @match        https://stake.com/*
 // @grant        none
 // ==/UserScript==
 
 (function() {
-  // --- Konstanta
+  // ---- Konstanta ----
   const API_URL = "https://stake.com/_api/graphql";
   const AUTH_PASSWORD = "sagara321";
   const LS_ACCOUNTS = "sb_accs";
   const T_SITEKEY = "0x4AAAAAAAGD4gMGOTFnvupz";
+  const SUPPORTED_CURRENCIES = [
+    "usdt", "btc", "eth", "ltc", "bch", "xrp", "trx", "doge", "shib", "usdc", "dai", "bnb", "busd", "ape", "sand", "uni", "cro", "sol", "pol", "link", "eos"
+  ];
 
-  // Inject Bootstrap
+  // --- Inject Bootstrap 5.3 CDN jika belum ada
   function injectBootstrap() {
     if (!document.getElementById("bs-claimer-bootstrap")) {
       const link = document.createElement("link");
@@ -30,13 +33,14 @@
   }
   injectBootstrap();
 
-  // Inject Cloudflare Turnstile JS
+  // --- Inject Cloudflare Turnstile JS jika belum ada
   function injectTurnstile() {
     if (!document.getElementById("cf-turnstile-js")) {
       const sc = document.createElement("script");
-      sc.id = "cf-turnstile-js";
-      sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad";
+      sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
       sc.async = true;
+      sc.defer = true;
+      sc.id = "cf-turnstile-js";
       document.head.appendChild(sc);
     }
   }
@@ -62,7 +66,7 @@
       </div>
     </div>
   </div>
-  <div id="fb-claimer-panel-main" class="container-fluid p-0" style="display:none;max-width:700px;height:100vh;overflow:auto;margin:60px auto 50px auto;z-index:2147483647;position:relative;">
+  <div id="fb-claimer-panel-main" class="container-fluid p-0" style="display:none;max-width:720px;margin:60px auto 50px auto;z-index:2147483647;position:relative;height:95vh;overflow-y:auto;">
     <nav class="navbar navbar-expand navbar-dark bg-primary rounded-bottom mb-4 px-4 py-2 shadow" style="z-index:999;">
       <span class="navbar-brand fw-bold">saBot Claimer</span>
       <span class="ms-auto text-light small">Site: stake.bet</span>
@@ -77,7 +81,7 @@
         <div class="my-2">
           <span id="fb-userStatus" class="badge bg-warning text-dark"></span>
         </div>
-        <div>Credits (USDT): <span id="fb-userCredits" class="fw-semibold text-warning">-</span></div>
+        <div>Credits: <span id="fb-userCredits" class="fw-semibold text-warning">-</span></div>
         <div id="fb-viphost" class="text-secondary small mt-1"></div>
         <div id="fb-faucet" class="text-secondary small"></div>
       </div>
@@ -100,10 +104,10 @@
       <div class="card-header fw-semibold bg-gradient text-primary">Bonus & Claim</div>
       <div class="card-body">
         <div class="row g-2 align-items-center mb-3">
-          <div class="col-7 col-md-8">
+          <div class="col-7 col-md-7">
             <input type="text" class="form-control" id="fb-checkBonusCode" maxlength="50" placeholder="Check Bonus Code Availability">
           </div>
-          <div class="col-3 col-md-2">
+          <div class="col-3 col-md-3">
             <select id="fb-couponType" class="form-select">
               <option value="bonus">BONUS</option>
               <option value="coupon">COUPON</option>
@@ -114,10 +118,13 @@
           </div>
         </div>
         <div class="row g-2 align-items-center mb-3">
-          <div class="col-7 col-md-8">
+          <div class="col-4 col-md-4">
             <input type="text" class="form-control" id="fb-bonusCodeInput" maxlength="50" placeholder="Enter Bonus Code">
           </div>
-          <div class="col-3 col-md-2">
+          <div class="col-4 col-md-4">
+            <select id="fb-claimCurrency" class="form-select"></select>
+          </div>
+          <div class="col-2 col-md-2">
             <select id="fb-claimType" class="form-select">
               <option value="ClaimBonusCode">Normal</option>
               <option value="ClaimConditionBonusCode">Condition</option>
@@ -128,10 +135,9 @@
           </div>
         </div>
         <div class="mb-2">
-          <label class="form-label">Turnstile Captcha:</label>
-          <input type="text" class="form-control mb-2" id="fb-turnstileToken" placeholder="Auto terisi jika captcha berhasil, atau bisa diisi manual/random.">
-          <div id="fb-turnstile-widget" class="my-2"></div>
-          <div class="form-text">Captcha bisa dikosongkan (otomatis generate random), atau klik widget untuk token asli.</div>
+          <label class="form-label mb-1">Captcha (Cloudflare Turnstile, wajib isi):</label>
+          <div id="fb-turnstile-widget"></div>
+          <input type="text" class="form-control mt-2" id="fb-turnstileToken" placeholder="Token diisi otomatis oleh captcha" readonly>
         </div>
         <div id="fb-status" class="alert py-2 px-3 mb-1 small" style="display:none;"></div>
         <div id="fb-log" class="border rounded small bg-dark-subtle p-2" style="min-height:60px;max-height:170px;overflow-y:auto;"></div>
@@ -141,17 +147,17 @@
   `;
   document.body.appendChild(root);
 
-  // --- Always on top & Scroll!
+  // Always on top + scrollable
   root.style.position = "fixed";
   root.style.top = "0";
   root.style.left = "0";
   root.style.width = "100vw";
   root.style.minHeight = "100vh";
-  root.style.maxHeight = "100vh";
-  root.style.overflow = "auto";
   root.style.zIndex = "2147483647";
   root.style.background = "rgba(28,36,46,0.97)";
   root.style.pointerEvents = "auto";
+  root.style.overflowY = "auto";
+  root.style.height = "100vh";
 
   // --- STATE, LOGIC
   let accounts = [];
@@ -194,30 +200,53 @@
       };
     });
   }
-  function randTurnstileToken() {
-    const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    let token = "0.";
-    for(let i=0; i<190; i++) token += charset[Math.floor(Math.random()*charset.length)];
-    return token;
-  }
 
-  // --- RENDER TURNSTILE WIDGET (setelah login modal hilang)
-  function renderTurnstileWidget() {
-    const container = document.getElementById('fb-turnstile-widget');
-    container.innerHTML = ""; // reset
-    if (window.turnstile && container) {
-      window.turnstile.render(container, {
+  // --- Render currency dropdown
+  function renderCurrencyDropdown() {
+    const select = document.getElementById("fb-claimCurrency");
+    select.innerHTML = "";
+    for (const cur of SUPPORTED_CURRENCIES) {
+      const opt = document.createElement("option");
+      opt.value = cur;
+      opt.innerText = cur.toUpperCase();
+      select.appendChild(opt);
+    }
+  }
+  renderCurrencyDropdown();
+
+  // --- Turnstile widget logic
+  let turnstileWidgetId = null;
+  function renderTurnstile() {
+    if (window.turnstile && document.getElementById('fb-turnstile-widget')) {
+      // Clear widget container
+      document.getElementById('fb-turnstile-widget').innerHTML = "";
+      // Render widget
+      turnstileWidgetId = window.turnstile.render('#fb-turnstile-widget', {
         sitekey: T_SITEKEY,
         callback: function(token) {
           document.getElementById('fb-turnstileToken').value = token;
+        },
+        "error-callback": function() {
+          document.getElementById('fb-turnstileToken').value = "";
         }
       });
-    } else {
-      setTimeout(renderTurnstileWidget, 600);
+    }
+  }
+  // Try render if loaded after dom
+  setTimeout(() => { if (window.turnstile) renderTurnstile(); }, 1500);
+  // Render again if API loaded later
+  window.onload = function() {
+    setTimeout(() => { if (window.turnstile) renderTurnstile(); }, 1000);
+  };
+  // Utility: rerender widget if needed
+  function resetTurnstile() {
+    if (window.turnstile && turnstileWidgetId !== null) {
+      window.turnstile.reset(turnstileWidgetId);
+      document.getElementById('fb-turnstileToken').value = "";
     }
   }
 
-  // --- Login Modal
+  // --- Modal Login
   document.getElementById('fb-loginBtn').onclick = function() {
     const val = document.getElementById('fb-loginPassword').value.trim();
     if (!val) return document.getElementById('fb-loginErr').textContent = "Password required!";
@@ -225,7 +254,7 @@
     document.getElementById('fb-claimer-modal').style.display = "none";
     document.getElementById('fb-claimer-panel-main').style.display = "";
     loadAccounts();
-    setTimeout(renderTurnstileWidget, 500);
+    setTimeout(renderTurnstile, 600); // widget
   };
   document.getElementById('fb-loginPassword').addEventListener('keydown', function(e) {
     if (e.key === "Enter") document.getElementById('fb-loginBtn').click();
@@ -337,13 +366,15 @@
     const code = document.getElementById('fb-bonusCodeInput').value.trim();
     if (!code) return showStatus('Input bonus code', "error");
     const type = document.getElementById('fb-claimType').value;
+    const currency = document.getElementById('fb-claimCurrency').value;
     let turnstileToken = document.getElementById('fb-turnstileToken').value.trim();
-    // --- Jika captcha kosong, generate otomatis token random
+
+    // Jika belum isi captcha, error!
     if (!turnstileToken) {
-      turnstileToken = randTurnstileToken();
-      document.getElementById('fb-turnstileToken').value = turnstileToken;
-      showStatus('Captcha token dikosongkan, memakai token random. Server bisa menolak claim!', 'info');
+      showStatus('Silakan selesaikan captcha (klik centang pada widget) sebelum claim!', "error");
+      return;
     }
+
     const mutation =
       type === "ClaimConditionBonusCode"
       ? `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
@@ -372,7 +403,7 @@
              redeemed
           }
       }`;
-    const variables = { code, currency: "usdt", turnstileToken };
+    const variables = { code, currency, turnstileToken };
     try {
       const res = await fetch(API_URL, {
         method: "POST",
@@ -386,27 +417,29 @@
         log("CLAIM " + code + " = " + JSON.stringify(json.data[dataKey]));
         const user = json.data[dataKey].user;
         if (user && user.balances) {
-          let usdt = "-";
-          if (user.balances.available && user.balances.available.currency?.toLowerCase() === "usdt") usdt = user.balances.available.amount;
-          if (user.balances.vault && user.balances.vault.currency?.toLowerCase() === "usdt") usdt += ` (Vault: ${user.balances.vault.amount})`;
-          document.getElementById('fb-userCredits').textContent = usdt;
+          let bal = "-";
+          if (user.balances.available && user.balances.available.currency?.toLowerCase() === currency) bal = user.balances.available.amount;
+          if (user.balances.vault && user.balances.vault.currency?.toLowerCase() === currency) bal += ` (Vault: ${user.balances.vault.amount})`;
+          document.getElementById('fb-userCredits').textContent = bal;
         }
+        resetTurnstile();
       } else if (json.errors && json.errors.length) {
         showStatus(json.errors[0].message, "error");
         log("CLAIM ERR " + code + ": " + json.errors[0].message);
+        resetTurnstile();
       } else {
         showStatus('Unknown error on bonus claim', "error");
+        resetTurnstile();
       }
-    } catch (e) { showStatus('Error on bonus claim', "error"); }
+    } catch (e) {
+      showStatus('Error on bonus claim', "error");
+      resetTurnstile();
+    }
   };
-
   document.getElementById('fb-bonusCodeInput').addEventListener('keydown', function(e) {
     if (e.key === "Enter") document.getElementById('fb-claimBonus').click();
   });
 
-  // Expose widget render (debug/manual)
-  window.fb_claim_renderTurnstileWidget = renderTurnstileWidget;
-  // Turnstile global callback
-  window.onTurnstileLoad = renderTurnstileWidget;
-
+  // --- Rerender Turnstile widget on script load
+  setTimeout(renderTurnstile, 2000);
 })();
