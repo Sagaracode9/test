@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         saBot Claimer Modern UI + Turnstile
 // @namespace    http://tampermonkey.net/
-// @version      4.0
+// @version      4.1
 // @description  Multi-account Stake bonus claimer + Cloudflare Turnstile captcha widget
 // @author       Gemini AI
 // @match        https://stake.com/*
@@ -49,7 +49,7 @@
   // --- UI Root
   const root = document.createElement('div');
   root.id = "fb-claimer-root";
-  root.innerHTML = 
+  root.innerHTML = `
   <div class="modal fade show d-block" id="fb-claimer-modal" tabindex="-1" aria-modal="true" role="dialog" style="background:rgba(34,44,55,0.96);z-index:2147483647;">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content shadow border-0">
@@ -144,7 +144,7 @@
       </div>
     </div>
   </div>
-  ;
+  `;
   document.body.appendChild(root);
 
   // Always on top + scrollable
@@ -175,20 +175,20 @@
   }
   function log(msg) {
     const logDiv = document.getElementById('fb-log');
-    logDiv.innerHTML += <div>${new Date().toLocaleTimeString()}: ${msg}</div>;
+    logDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${msg}</div>`;
     logDiv.scrollTop = logDiv.scrollHeight;
   }
   function renderAccounts() {
     const wrap = document.getElementById('fb-accounts');
     wrap.innerHTML = "";
     if (accounts.length === 0) {
-      wrap.innerHTML = <div class="text-muted small py-2">No accounts connected yet.</div>;
+      wrap.innerHTML = `<div class="text-muted small py-2">No accounts connected yet.</div>`;
     }
     accounts.forEach((acc, idx) => {
       const div = document.createElement('div');
       div.className = "alert alert-secondary d-flex justify-content-between align-items-center py-2 mb-2" + (activeApiKey && acc.apiKey === activeApiKey ? " border-success border-2" : "");
-      div.innerHTML = <span class="fw-semibold text-info">${acc.name || "(Unnamed)"}</span>
-      <button class="btn btn-sm btn-danger ms-2" data-idx="${idx}">🗑️</button>;
+      div.innerHTML = `<span class="fw-semibold text-info">${acc.name || "(Unnamed)"}</span>
+      <button class="btn btn-sm btn-danger ms-2" data-idx="${idx}">🗑️</button>`;
       wrap.appendChild(div);
     });
     wrap.querySelectorAll('button.btn-danger').forEach(btn => {
@@ -218,15 +218,16 @@
   let turnstileWidgetId = null;
   function renderTurnstile() {
     if (window.turnstile && document.getElementById('fb-turnstile-widget')) {
-      // Clear widget container
       document.getElementById('fb-turnstile-widget').innerHTML = "";
-      // Render widget
       turnstileWidgetId = window.turnstile.render('#fb-turnstile-widget', {
         sitekey: T_SITEKEY,
         callback: function(token) {
           document.getElementById('fb-turnstileToken').value = token;
         },
         "error-callback": function() {
+          document.getElementById('fb-turnstileToken').value = "";
+        },
+        "expired-callback": function() {
           document.getElementById('fb-turnstileToken').value = "";
         }
       });
@@ -269,12 +270,12 @@
     showStatus('Connecting to API...');
     let userId = "-", userName = "-", userStatus = "";
     try {
-      const query = query UserMeta($name: String) {
+      const query = `query UserMeta($name: String) {
         user(name: $name) {
           id name isMuted isRainproof isBanned createdAt campaignSet
           selfExclude { id status active createdAt expireAt }
         }
-      };
+      }`;
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-access-token": activeApiKey },
@@ -305,7 +306,7 @@
     }
     let usdt = "-";
     try {
-      const query = query UserBalances { user { id balances { available { amount currency } vault { amount currency } } } };
+      const query = `query UserBalances { user { id balances { available { amount currency } vault { amount currency } } } }`;
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-access-token": activeApiKey },
@@ -315,7 +316,7 @@
       if (json.data && json.data.user && json.data.user.balances) {
         let bal = json.data.user.balances;
         if (bal.available && bal.available.currency?.toLowerCase() === "usdt") usdt = bal.available.amount;
-        if (bal.vault && bal.vault.currency?.toLowerCase() === "usdt") usdt +=  (Vault: ${bal.vault.amount});
+        if (bal.vault && bal.vault.currency?.toLowerCase() === "usdt") usdt += ` (Vault: ${bal.vault.amount})`;
       }
     } catch (e) { log("UserBalances error: "+e.message); }
     document.getElementById('fb-userId').textContent = userId;
@@ -340,9 +341,9 @@
     if (!code) return showStatus('Input code!', 'error');
     let couponType = document.getElementById('fb-couponType').value;
     couponType = couponType.toLowerCase();
-    const query = query BonusCodeAvailability($code: String!, $couponType: CouponType!) {
+    const query = `query BonusCodeAvailability($code: String!, $couponType: CouponType!) {
       bonusCodeAvailability(code: $code, couponType: $couponType)
-    };
+    }`;
     const variables = { code, couponType };
     try {
       const res = await fetch(API_URL, {
@@ -377,7 +378,7 @@
 
     const mutation =
       type === "ClaimConditionBonusCode"
-      ? mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
+      ? `mutation ClaimConditionBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
           claimConditionBonusCode(
              code: $code
              currency: $currency
@@ -389,8 +390,8 @@
              user { id balances { available { amount currency } vault { amount currency } } }
              redeemed
           }
-      }
-      : mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
+      }`
+      : `mutation ClaimBonusCode($code: String!, $currency: CurrencyEnum!, $turnstileToken: String!) {
           claimBonusCode(
              code: $code
              currency: $currency
@@ -402,7 +403,7 @@
              user { id balances { available { amount currency } vault { amount currency } } }
              redeemed
           }
-      };
+      }`;
     const variables = { code, currency, turnstileToken };
     try {
       const res = await fetch(API_URL, {
@@ -413,13 +414,13 @@
       const json = await res.json();
       const dataKey = type === "ClaimConditionBonusCode" ? "claimConditionBonusCode" : "claimBonusCode";
       if (json.data && json.data[dataKey]) {
-        showStatus(Claimed: ${json.data[dataKey].amount} ${json.data[dataKey].currency}, "success");
+        showStatus(`Claimed: ${json.data[dataKey].amount} ${json.data[dataKey].currency}`, "success");
         log("CLAIM " + code + " = " + JSON.stringify(json.data[dataKey]));
         const user = json.data[dataKey].user;
         if (user && user.balances) {
           let bal = "-";
           if (user.balances.available && user.balances.available.currency?.toLowerCase() === currency) bal = user.balances.available.amount;
-          if (user.balances.vault && user.balances.vault.currency?.toLowerCase() === currency) bal +=  (Vault: ${user.balances.vault.amount});
+          if (user.balances.vault && user.balances.vault.currency?.toLowerCase() === currency) bal += ` (Vault: ${user.balances.vault.amount})`;
           document.getElementById('fb-userCredits').textContent = bal;
         }
         resetTurnstile();
