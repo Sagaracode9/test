@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         saBot Claimer Modern UI + Turnstile (Gabung Check & Claim - Bonus/Drop)
+// @name         saBot Claimer Modern UI + Turnstile (Gabung Check & Claim - Bonus/Drop Enum)
 // @namespace    http://tampermonkey.net/
-// @version      4.2
-// @description  Multi-account Stake bonus claimer + Cloudflare Turnstile captcha widget - 1 Form Bonus/Drop
+// @version      4.3
+// @description  Multi-account Stake bonus/drop claimer + Cloudflare Turnstile captcha widget - 1 Form (CouponType enum fix)
 // @author       Gemini AI + ChatGPT
 // @match        https://stake.com/*
 // @grant        none
@@ -109,8 +109,8 @@
           </div>
           <div class="col-3 col-md-3">
             <select id="fb-couponType" class="form-select">
-              <option value="bonus">BONUS</option>
-              <option value="coupon">DROP</option>
+              <option value="BONUS">BONUS</option>
+              <option value="DROP">DROP</option>
             </select>
           </div>
           <div class="col-2 col-md-2">
@@ -323,15 +323,12 @@
     } catch { showStatus('Clipboard not accessible', "error"); }
   };
 
-  // --- Gabungan 1 tombol: Check & Claim
+  // --- Gabungan 1 tombol: Check & Claim (enum CouponType fix)
   document.getElementById('fb-btnCheckClaim').onclick = async function() {
     if (!activeApiKey) return showStatus('Connect API Key first', "error");
     const code = document.getElementById('fb-codeInput').value.trim();
     if (!code) return showStatus('Input bonus/drop code!', "error");
-    let couponType = document.getElementById('fb-couponType').value;
-    // Ubah value DROP menjadi 'coupon' agar sesuai API backend!
-    if (couponType === "DROP") couponType = "coupon";
-    couponType = couponType.toLowerCase();
+    const couponType = document.getElementById('fb-couponType').value; // langsung enum, tidak perlu lowercase
     const type = document.getElementById('fb-claimType').value;
     const currency = document.getElementById('fb-claimCurrency').value;
     let turnstileToken = document.getElementById('fb-turnstileToken').value.trim();
