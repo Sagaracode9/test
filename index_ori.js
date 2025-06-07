@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         saBot Claimer Modern UI + Turnstile
 // @namespace    http://tampermonkey.net/
-// @version      4.0
+// @version      4.1
 // @description  Multi-account Stake bonus claimer + Cloudflare Turnstile captcha widget
 // @author       Gemini AI
 // @match        https://stake.com/*
@@ -218,15 +218,16 @@
   let turnstileWidgetId = null;
   function renderTurnstile() {
     if (window.turnstile && document.getElementById('fb-turnstile-widget')) {
-      // Clear widget container
       document.getElementById('fb-turnstile-widget').innerHTML = "";
-      // Render widget
       turnstileWidgetId = window.turnstile.render('#fb-turnstile-widget', {
         sitekey: T_SITEKEY,
         callback: function(token) {
           document.getElementById('fb-turnstileToken').value = token;
         },
         "error-callback": function() {
+          document.getElementById('fb-turnstileToken').value = "";
+        },
+        "expired-callback": function() {
           document.getElementById('fb-turnstileToken').value = "";
         }
       });
